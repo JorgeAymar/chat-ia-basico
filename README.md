@@ -1,4 +1,4 @@
-# Ámbar — chat local con Ollama
+# Chat-IA — chat local con Ollama
 
 App de chat conectada a un modelo de Ollama corriendo en `localhost`, con historial de conversaciones persistido en Postgres. Proyecto personal, corre 100% en tu máquina (salvo que elijas explícitamente un modelo `-cloud` de Ollama).
 
@@ -55,8 +55,8 @@ La app queda en `http://localhost:3000`.
   - Texto/código (`.md`, `.json`, `.csv`, `.log`, `.js`, `.ts`, `.py`, etc.): máx. 300KB por archivo en el navegador, y se trunca a 20.000 caracteres antes de mandarlo al modelo. Se inyecta como bloque citado en el mensaje.
   - Imágenes: máx. 5MB por archivo, se codifican en base64 y se mandan al array `images` de la API multimodal de Ollama.
 - **Borrar conversaciones**: botón de papelera por conversación en el historial, con un modal de confirmación propio (no `window.confirm`) que avisa que la acción no se puede deshacer.
-- **Indicador de conexión con Ollama**: punto verde/rojo animado en la sidebar (conectado/desconectado), más la URL de Ollama detectada debajo del título.
-- **Aviso de modelo cloud**: si el modelo activo termina en `-cloud`/`:cloud` (modelos que Ollama proxea hacia sus propios servidores), la UI muestra un ícono ☁ en el selector y un texto explícito avisando que ese chat sí sale de la máquina — a diferencia de los modelos locales.
+- **Indicador de conexión con Ollama**: punto verde/rojo en la sidebar (conectado/desconectado), más la URL de Ollama detectada debajo del título.
+- **Aviso de modelo cloud**: si el modelo activo termina en `-cloud`/`:cloud` (modelos que Ollama proxea hacia sus propios servidores), la UI muestra la etiqueta de texto "(cloud)" en el selector y un texto explícito avisando que ese chat sí sale de la máquina — a diferencia de los modelos locales.
 - **Configuración (botón de engranaje ⚙)**:
   - **Prompt de sistema**: editable desde la UI, se persiste en el archivo `SYSTEM_PROMPT.md` en la raíz del proyecto (no en la base de datos). Se envía como mensaje `role: system` en cada llamada a Ollama.
   - **Memoria persistente**: notas de texto libre (máx. 500 caracteres, máx. 100 notas) que se guardan en Postgres (`Memory`) y se recuerdan en **todas** las conversaciones, no solo en la actual. Se agregan al prompt de sistema como una lista con encabezado "Cosas que sabés sobre el usuario".
@@ -68,7 +68,7 @@ src/
   app/
     page.tsx                       UI completa: sidebar/historial, composer, adjuntos,
                                     modal de borrado, modal de configuración, selector de modelo
-    layout.tsx                     layout raíz, fuentes (Fraunces + Plus Jakarta Sans), metadata
+    layout.tsx                     layout raíz, fuentes (IBM Plex Sans + Plus Jakarta Sans), metadata
     globals.css                    estilos globales / variables de tema (Tailwind 4)
     api/
       models/route.ts              GET: modelos detectados en vivo desde Ollama + modelo por defecto

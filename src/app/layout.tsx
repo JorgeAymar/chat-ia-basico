@@ -14,7 +14,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Ámbar · Chat local con Ollama",
+  title: "Chat-IA · Chat local con Ollama",
   description: "Chat privado conectado a Ollama, corriendo en tu máquina.",
 };
 

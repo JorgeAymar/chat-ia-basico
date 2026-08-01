@@ -311,6 +311,11 @@ export default function Home() {
 
   async function handleSend() {
     if ((!input.trim() && pendingAttachments.length === 0) || isStreaming) return;
+    // Se activa ACÁ, antes de cualquier await: si no, la ventana async de
+    // crear la conversación (cuando todavía no hay activeId) deja el botón
+    // habilitado y un segundo click re-entra a handleSend, creando una
+    // conversación duplicada con el mismo primer mensaje.
+    setIsStreaming(true);
 
     let conversationId = activeId;
     if (!conversationId) {
@@ -322,6 +327,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "No se pudo crear la conversación");
+        setIsStreaming(false);
         return;
       }
       conversationId = data.conversation.id;
@@ -339,7 +345,6 @@ export default function Home() {
       { id: `local-${Date.now()}`, role: "user", content: userText, attachments },
     ]);
 
-    setIsStreaming(true);
     const assistantId = `local-${Date.now()}-assistant`;
     setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
 
@@ -460,7 +465,7 @@ export default function Home() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={ready ? "Escribe tu mensaje…" : "Configura OLLAMA_MODELS en .env"}
+          placeholder={ready ? "Escribe tu mensaje…" : "No hay modelos instalados en Ollama"}
           disabled={isStreaming || !ready}
           autoFocus
           className="flex-1 rounded-full bg-transparent py-2.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-dim)] outline-none disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
@@ -549,7 +554,7 @@ export default function Home() {
             }
           />
           <h1 className="font-[family-name:var(--font-display)] text-base font-semibold tracking-tight text-[var(--ink)]">
-            Ámbar
+            Chat-IA
           </h1>
           <span
             className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-widest ${

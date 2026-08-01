@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 /**
- * Helpers compartidos por los specs E2E de Ámbar.
+ * Helpers compartidos por los specs E2E de Chat-IA.
  * Nada acá está hardcodeado a un valor de negocio: todo lo que identifica un
  * mensaje/conversación/nota de memoria en un test se genera con un sufijo
  * único (timestamp + random) para poder correr los tests en paralelo o en

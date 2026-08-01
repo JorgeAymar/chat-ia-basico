@@ -1,4 +1,4 @@
-# Plan de pruebas — Ámbar (chat-ia-basico)
+# Plan de pruebas — Chat-IA (chat-ia-basico)
 
 Generado explorando la app real con Playwright (`http://localhost:3000`), leyendo el código fuente completo, y auditando dependencias y valores hardcodeados. Este documento es **solo el plan** — no implementa tests todavía.
 
@@ -19,8 +19,8 @@ Explorado en vivo con Playwright (desktop 1440×900 y mobile 390×844).
 | Botón adjuntar archivo | `aria-label="Adjuntar archivo"`, abre `<input type="file" multiple>` oculto |
 | Input file oculto | `accept="image/*,text/*,.md,.json,.csv,.log,.js,.ts,.tsx,.jsx,.py,.go,.rb,.java,.c,.cpp,.h,.css,.html,.yml,.yaml"`, `multiple` |
 | Botón enviar | `aria-label="Enviar mensaje"`, deshabilitado sin texto/adjuntos o mientras streamea |
-| Selector de modelo (`<select>`) | debajo del composer, 10 opciones detectadas en vivo de Ollama, con ícono ☁ si es modelo `-cloud` |
-| Indicador de estado Ollama | punto verde/rojo animado + badge "local"/"sin conexión" + URL de Ollama visible en texto mono |
+| Selector de modelo (`<select>`) | debajo del composer, 10 opciones detectadas en vivo de Ollama, con la etiqueta de texto "(cloud)" si es modelo `-cloud` |
+| Indicador de estado Ollama | punto verde/rojo + badge "local"/"sin conexión" + URL de Ollama visible en texto mono |
 
 ### Modal de Configuración (`role="dialog"`)
 | Elemento | Detalle |
@@ -40,8 +40,8 @@ Explorado en vivo con Playwright (desktop 1440×900 y mobile 390×844).
 | Botón Borrar | `DELETE /api/conversations/[id]`, refresca sidebar |
 
 ### Vista con conversación activa
-- Burbujas de usuario (derecha, degradé índigo, texto blanco) y asistente (izquierda, avatar "a", borde sutil).
-- Adjuntos en burbujas: miniatura para imágenes, chip "📄 nombre" para texto.
+- Burbujas de usuario (derecha, fondo índigo sólido, texto blanco) y asistente (izquierda, avatar "A", borde sutil).
+- Adjuntos en burbujas: miniatura para imágenes, chip con ícono de documento para texto.
 - Indicador de "escribiendo" (3 puntos pulsantes) mientras streamea.
 - Selector de modelo se deshabilita con conversación activa.
 - Banner de error (⚠) rojo cuando algo falla.
@@ -71,7 +71,7 @@ Convención de ID: `F-<área>-<número>`.
 
 ### F-MODEL — Selección y detección de modelos
 - **F-MODEL-01**: al cargar la app, `GET /api/models` refleja exactamente lo que devuelve `ollama list` / `GET /api/tags` — sin filtrar por `.env` (comportamiento reciente, reemplazó la vieja allow-list `OLLAMA_MODELS`).
-- **F-MODEL-02**: modelos con sufijo `-cloud`/`:cloud` muestran ícono ☁ en el dropdown y activan el aviso "tus mensajes sí salen de tu máquina" en el header y en el estado vacío.
+- **F-MODEL-02**: modelos con sufijo `-cloud`/`:cloud` muestran la etiqueta "(cloud)" en el dropdown y activan el aviso "tus mensajes sí salen de tu máquina" en el header y en el estado vacío.
 - **F-MODEL-03**: si Ollama está caído al cargar la app, `ollamaOnline` pasa a `false`, el punto se pone rojo, el badge dice "sin conexión", y se muestra un error legible (no una pantalla rota).
 - **F-MODEL-04**: cambiar el modelo en el dropdown antes de enviar el primer mensaje debe reflejarse en la conversación que se crea.
 
