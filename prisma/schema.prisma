@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  title     String    @default("Nueva conversación")
+  model     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  // Soporta el ORDER BY updatedAt desc que arma el historial del sidebar
+  // (GET /api/conversations).
+  @@index([updatedAt])
+}
+
+enum Role {
+  user
+  assistant
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           Role
+  content        String
+  model          String?
+  // Array de { name, kind: "text" | "image", mimeType, content } — para
+  // "text" el contenido es texto plano (truncado); para "image" es base64.
+  attachments    Json?
+  createdAt      DateTime     @default(now())
+
+  // Compuesto: cubre el filtro por conversación Y el ORDER BY createdAt asc
+  // que arma el historial de una conversación (GET /api/conversations/[id]
+  // y la reconstrucción de contexto en POST /api/chat) sin un sort aparte.
+  @@index([conversationId, createdAt])
+}
+
+// Notas persistentes que el asistente "recuerda" en TODAS las conversaciones
+// (no solo en la que se creó), a diferencia del historial de una Conversation.
+model Memory {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+}
