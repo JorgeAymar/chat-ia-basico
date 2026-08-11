@@ -6,16 +6,21 @@ import {
   trackConsoleErrors,
   uniqueSuffix,
   waitForModelsReady,
+  waitForStreamEnd,
 } from "./helpers";
 
 const TXT_FIXTURE = path.join(__dirname, "fixtures", "test-doc.txt");
 const IMG_FIXTURE = path.join(__dirname, "fixtures", "test-image.png");
-const SECRET_CODE = "AMBAR-7X92"; // debe coincidir con e2e/fixtures/test-doc.txt
+const MARKER = "AMBAR-7X92"; // debe coincidir con e2e/fixtures/test-doc.txt
 
 // F-ATTACH — Adjuntos (TEST_PLAN.md F-ATTACH-01..09)
 
 test.describe("F-ATTACH — Adjuntos", () => {
-  test("F-ATTACH-02: el modelo lee el contenido del .txt adjunto y responde con el código secreto", async ({
+  // Estos tests esperan respuestas reales del Ollama remoto: el timeout por
+  // test de 30s del config no alcanza.
+  test.describe.configure({ timeout: 180_000 });
+
+  test("F-ATTACH-02: el modelo lee el contenido del .txt adjunto y responde con el identificador que contiene", async ({
     page,
   }) => {
     const errors = trackConsoleErrors(page);
@@ -28,23 +33,22 @@ test.describe("F-ATTACH — Adjuntos", () => {
     // El chip con el nombre del archivo debe aparecer antes de enviar (F-ATTACH-01).
     await expect(page.getByText("test-doc.txt")).toBeVisible();
 
-    // Pedimos que copie el contenido textual (no que "revele un secreto"):
-    // algunos modelos rechazan preguntas frasedas como "¿cuál es el código
-    // secreto?" por un falso positivo de alineación/seguridad, aun cuando
-    // el archivo se leyó correctamente. Pedir una transcripción literal es
-    // una tarea benigna que igual prueba que el contenido del adjunto llega
-    // al modelo (si no llegara, no podría transcribirlo).
-    const text = `Copia textualmente, línea por línea, todo el contenido del archivo de texto que adjunté. ${uniqueSuffix()}`;
+    // Se pide el identificador de forma explícita y neutra: pedir "copiá el
+    // código secreto" (o un documento que diga "no compartas esto") dispara
+    // rechazos por falso positivo de alineación en los modelos cloud, aunque
+    // el adjunto se haya leído perfecto. Si el contenido del archivo no
+    // llegara al modelo, este no podría responder el identificador.
+    const text = `¿Qué identificador aparece en el archivo de texto que adjunté? Respondé solo con ese identificador. ${uniqueSuffix()}`;
     await messageInput(page).fill(text);
-    const btn = sendButton(page);
-    await btn.click();
+    await sendButton(page).click();
 
-    await expect(btn.locator(".think-dot")).toBeVisible({ timeout: 5000 });
-    await expect(btn.locator("svg")).toBeVisible({ timeout: 120000 });
+    await waitForStreamEnd(page);
 
     // La respuesta del asistente debe contener el código leído del archivo:
-    // esto valida que el contenido se lee de verdad, no que el archivo "se ve" nomás.
-    await expect(page.locator("main").getByText(SECRET_CODE)).toBeVisible({ timeout: 5000 });
+    // esto valida que el contenido se lee de verdad, no que el archivo "se ve"
+    // nomás. Se usa toContainText sobre `main` porque la respuesta se renderiza
+    // como Markdown y el código puede quedar dentro de un <code>/<strong>.
+    await expect(page.locator("main")).toContainText(MARKER, { timeout: 5000 });
 
     expect(errors).toEqual([]);
   });
@@ -86,10 +90,8 @@ test.describe("F-ATTACH — Adjuntos", () => {
 
     const text = `Describe brevemente la imagen adjunta ${uniqueSuffix()}`;
     await messageInput(page).fill(text);
-    const btn = sendButton(page);
-    await btn.click();
-    await expect(btn.locator(".think-dot")).toBeVisible({ timeout: 5000 });
-    await expect(btn.locator("svg")).toBeVisible({ timeout: 120000 });
+    await sendButton(page).click();
+    await waitForStreamEnd(page);
 
     // Thumbnail después de enviar, ya dentro de la burbuja del usuario.
     await expect(page.locator("main img").first()).toBeVisible();

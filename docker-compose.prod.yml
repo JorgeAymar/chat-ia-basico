@@ -1,0 +1,65 @@
+# Stack de producción. Dos piezas quedan AFUERA de este archivo a propósito:
+#
+# - nginx corre en el host del VPS, no en un contenedor: manejar
+#   certificados Let's Encrypt con certbot es mucho más simple cuando nginx
+#   tiene acceso directo al puerto 80/443 del host. Ver nginx/orion.conf.
+#
+# - El servicio `app` NO está acá: lo maneja deploy.sh con `docker run`
+#   directo, no `docker compose up`. Es lo que permite tener dos
+#   contenedores de la app corriendo a la vez con nombres/puertos distintos
+#   (blue/green) durante un despliegue sin caída — Compose no modela bien
+#   "dos instancias nombradas del mismo servicio" para ese swap puntual.
+#   deploy.sh los conecta a la red que este archivo crea (`orion_default`,
+#   por el nombre de proyecto `-p orion` con el que se levanta este stack).
+#
+# postgres y searxng NO publican puertos al host: solo la app los necesita,
+# y solo por la red interna de Docker (nombre de servicio como host). Menos
+# superficie expuesta que en docker-compose.yml (desarrollo), que sí publica
+# esos puertos para poder pegarles con `psql`/curl desde la máquina.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-chatuser}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}"
+      POSTGRES_DB: ${POSTGRES_DB:-chat_ia_basico}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chatuser}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - "SEARXNG_SECRET=${SEARXNG_SECRET:?falta SEARXNG_SECRET en .env}"
+      - SEARXNG_LIMITER=false
+      - SEARXNG_PUBLIC_INSTANCE=false
+    volumes:
+      - ./searxng:/etc/searxng:rw
+      - searxng-cache:/var/cache/searxng
+
+  # Job de una sola corrida: aplica las migraciones pendientes y termina.
+  # deploy.sh lo corre con `docker compose run --rm migrate` antes de
+  # levantar el contenedor nuevo de la app en cada despliegue.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    restart: "no"
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-chatuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-chat_ia_basico}?schema=public"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  searxng-cache:

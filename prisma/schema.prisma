@@ -11,17 +11,100 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  OWNER
+  MEMBER
+}
+
+enum UserStatus {
+  // Existe la fila (para que la invitación tenga a quién apuntar) pero
+  // todavía no aceptó: no puede loguearse hasta que use el link de invitación.
+  INVITED
+  ACTIVE
+}
+
+model User {
+  id         String     @id @default(cuid())
+  email      String     @unique
+  // Null mientras status es INVITED: recién se completa cuando la persona
+  // define su contraseña al aceptar la invitación (o al resetearla). Nunca
+  // es la contraseña en texto plano — ver src/lib/auth/password.ts.
+  passwordHash String?
+  role       UserRole   @default(MEMBER)
+  status     UserStatus @default(INVITED)
+  createdAt  DateTime   @default(now())
+  acceptedAt DateTime?
+
+  // Quién lo invitó. onDelete: SetNull porque perder al invitador no debería
+  // arrastrar el borrado del invitado; onUpdate: NoAction es obligatorio en
+  // Postgres para una self-relation opcional en Prisma.
+  invitedById  String?
+  invitedBy    User?   @relation("Invitations", fields: [invitedById], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  invitedUsers User[]  @relation("Invitations")
+
+  conversations Conversation[]
+  memories      Memory[]
+  loginTokens   LoginToken[]
+  sessions      Session[]
+}
+
+enum TokenPurpose {
+  // Primer ingreso: activa la cuenta INVITED → ACTIVE y deja definir la
+  // contraseña inicial.
+  INVITE
+  // "Olvidé mi contraseña": deja definir una nueva sin saber la vieja.
+  RESET
+}
+
+// Token de un solo uso para las dos únicas cosas que se hacen por email en
+// esta app: aceptar una invitación y resetear la contraseña. El login del
+// día a día NO usa tokens — es email + contraseña directo.
+model LoginToken {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Se guarda el hash del token, nunca el token en texto plano: si alguien
+  // lee la base, no puede loguearse como cualquier usuario con esos datos.
+  tokenHash String       @unique
+  purpose   TokenPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+}
+
+// Sesión en base, no un JWT autocontenido: permite revocar ("cerrar sesión
+// en todos los dispositivos") borrando la fila, algo que un JWT firmado no
+// permite sin una lista de revocación aparte.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model Conversation {
   id        String    @id @default(cuid())
   title     String    @default("Nueva conversación")
   model     String
+  // Las conversaciones fijadas van arriba de todo en el sidebar, separadas
+  // del resto del historial.
+  pinned    Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
 
-  // Soporta el ORDER BY updatedAt desc que arma el historial del sidebar
-  // (GET /api/conversations).
-  @@index([updatedAt])
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Soporta el ORDER BY pinned desc, updatedAt desc que arma el historial
+  // del sidebar, ya filtrado por dueño (GET /api/conversations).
+  @@index([userId, pinned, updatedAt])
 }
 
 enum Role {
@@ -39,6 +122,19 @@ model Message {
   // Array de { name, kind: "text" | "image", mimeType, content } — para
   // "text" el contenido es texto plano (truncado); para "image" es base64.
   attachments    Json?
+  // Razonamiento del modelo (bloque <think> o campo `thinking` de Ollama),
+  // separado de `content` para poder plegarlo en la UI y NO reinyectarlo
+  // como contexto en los turnos siguientes.
+  thinking       String?
+  // Cuánto tardó el modelo en razonar, en milisegundos. Se persiste porque es
+  // un dato de la generación que no se puede reconstruir después: del texto
+  // guardado no se deduce cuánto tiempo llevó producirlo, y un cronómetro en
+  // el cliente muere con la recarga de la página. Null en los mensajes
+  // anteriores a esta columna y en los que nunca razonaron.
+  thinkingMs     Int?
+  // Array de { title, url, snippet } — resultados de búsqueda web que se
+  // usaron para responder este mensaje. Solo en mensajes del asistente.
+  sources        Json?
   createdAt      DateTime     @default(now())
 
   // Compuesto: cubre el filtro por conversación Y el ORDER BY createdAt asc
@@ -47,10 +143,16 @@ model Message {
   @@index([conversationId, createdAt])
 }
 
-// Notas persistentes que el asistente "recuerda" en TODAS las conversaciones
-// (no solo en la que se creó), a diferencia del historial de una Conversation.
+// Notas persistentes que el asistente "recuerda" en todas las conversaciones
+// DE SU DUEÑO (no de todos los usuarios), a diferencia del historial de una
+// Conversation puntual.
 model Memory {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

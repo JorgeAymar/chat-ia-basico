@@ -51,7 +51,12 @@ describe("buildOllamaMessage", () => {
 describe("parseNdjsonLine", () => {
   it("línea JSON válida con message.content devuelve el texto", () => {
     const line = JSON.stringify({ message: { content: "hola" }, done: false });
-    expect(parseNdjsonLine(line)).toBe("hola");
+    expect(parseNdjsonLine(line)).toEqual({ content: "hola", thinking: "" });
+  });
+
+  it("el campo thinking de la API nueva de Ollama viaja aparte del contenido", () => {
+    const line = JSON.stringify({ message: { thinking: "mmm", content: "" } });
+    expect(parseNdjsonLine(line)).toEqual({ content: "", thinking: "mmm" });
   });
 
   it("línea vacía devuelve null", () => {
@@ -62,12 +67,19 @@ describe("parseNdjsonLine", () => {
     expect(parseNdjsonLine("   ")).toBeNull();
   });
 
-  it("línea con message sin content devuelve null", () => {
+  it("línea con message sin content ni thinking devuelve null", () => {
     const line = JSON.stringify({ message: {}, done: true });
     expect(parseNdjsonLine(line)).toBeNull();
   });
 
   it("línea con JSON inválido lanza", () => {
     expect(() => parseNdjsonLine("{esto no es json")).toThrow();
+  });
+
+  it("una línea de error a mitad de stream lanza en vez de pasar desapercibida", () => {
+    // Ollama ya mandó HTTP 200, así que avisa del fallo con una línea suelta
+    // que solo tiene `error`. Ignorarla haría que el chat corte sin explicar.
+    const line = JSON.stringify({ error: "model runner has unexpectedly stopped" });
+    expect(() => parseNdjsonLine(line)).toThrow(/model runner has unexpectedly stopped/);
   });
 });

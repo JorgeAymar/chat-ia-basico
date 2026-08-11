@@ -70,8 +70,11 @@ test.describe("F-MODEL — Selección y detección de modelos", () => {
     const statusDot = page.locator('aside [title="Ollama conectado"]');
     await expect(statusDot).toHaveClass(/bg-emerald-\d+/, { timeout: 10000 });
 
-    // El badge de texto debe decir "local", no "sin conexión".
-    await expect(page.getByText("local", { exact: true })).toBeVisible();
+    // El badge de texto se deriva de la propia respuesta de /api/models:
+    // "sin conexión" si Ollama no responde, "remoto" si corre fuera de esta
+    // máquina y "local" si corre acá. No se hardcodea ninguno de los tres.
+    const expectedBadge = data.source !== "ollama" ? "sin conexión" : data.remote ? "remoto" : "local";
+    await expect(page.locator("aside").getByText(expectedBadge, { exact: true })).toBeVisible();
 
     expect(errors).toEqual([]);
   });

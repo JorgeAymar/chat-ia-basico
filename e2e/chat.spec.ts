@@ -1,11 +1,13 @@
 import { test, expect } from "@playwright/test";
 import {
+  messageBubbles,
   messageInput,
   sendButton,
   sendMessageAndWaitForReply,
   trackConsoleErrors,
   uniqueSuffix,
   waitForModelsReady,
+  waitForStreamEnd,
 } from "./helpers";
 
 // F-CHAT — Conversación (ver TEST_PLAN.md secciones F-CHAT-01..11)
@@ -13,6 +15,10 @@ import {
 // anti-doble-envío, mensaje vacío, y "Nueva conversación" sin fila vacía.
 
 test.describe("F-CHAT — Conversación", () => {
+  // Cada envío espera una respuesta real del Ollama remoto: el timeout por
+  // test de 30s del config no alcanza.
+  test.describe.configure({ timeout: 180_000 });
+
   test("F-CHAT-01: enviar el primer mensaje crea la conversación y auto-genera el título", async ({
     page,
   }) => {
@@ -24,7 +30,7 @@ test.describe("F-CHAT — Conversación", () => {
     await sendMessageAndWaitForReply(page, text);
 
     // El mensaje del usuario debe verse en la burbuja de la conversación.
-    await expect(page.locator("main").getByText(text, { exact: true })).toBeVisible();
+    await expect(messageBubbles(page).getByText(text, { exact: true })).toBeVisible();
 
     // El título (texto completo, ya que es < 45 chars) debe aparecer en el
     // historial del sidebar, confirmando que la conversación se creó en DB.
@@ -42,6 +48,9 @@ test.describe("F-CHAT — Conversación", () => {
     await page.goto("/");
     await waitForModelsReady(page);
 
+    // 5 idas y vueltas contra un modelo remoto: se le da margen extra.
+    test.setTimeout(600_000);
+
     const suffix = uniqueSuffix();
     const texts = Array.from({ length: 5 }, (_, i) => `Turno ${i + 1} ${suffix}`);
 
@@ -50,33 +59,24 @@ test.describe("F-CHAT — Conversación", () => {
     }
 
     // Cada mensaje de usuario debe aparecer exactamente una vez dentro del
-    // área de mensajes (no duplicado). Scopeado a `main` porque el mismo
-    // texto también aparece como título en el sidebar (solo el 1er mensaje).
+    // área de mensajes (no duplicado). Scopeado a las burbujas porque el
+    // mismo texto también aparece como título en el sidebar y en el header
+    // (solo el del 1er mensaje).
     for (const text of texts) {
-      await expect(page.locator("main").getByText(text, { exact: true })).toHaveCount(1);
+      await expect(messageBubbles(page).getByText(text, { exact: true })).toHaveCount(1);
     }
 
     // Deben existir al menos 10 burbujas (5 user + 5 assistant), sin pérdidas.
-    const bubbleCount = await page.locator("main .msg-enter").count();
+    const bubbleCount = await messageBubbles(page).count();
     expect(bubbleCount).toBeGreaterThanOrEqual(10);
 
     expect(errors).toEqual([]);
   });
 
-  // HALLAZGO (bug real de la app, NO corregido acá por consigna — ver
-  // src/app/page.tsx `handleSend`): este test falla de forma reproducible.
-  // Un doble click rápido en "Enviar" crea DOS conversaciones separadas,
-  // cada una con el mismo primer mensaje, en vez de bloquear el segundo
-  // envío. Causa raíz: `handleSend` solo revisa `isStreaming` al entrar,
-  // pero `setIsStreaming(true)` se llama recién DESPUÉS del `await fetch(
-  // "/api/conversations", ...)` que crea la conversación cuando no hay
-  // `activeId` todavía. Durante esa ventana async, el botón de enviar
-  // sigue habilitado (isStreaming sigue en false y el input todavía tiene
-  // texto), así que un segundo click que caiga en esa ventana vuelve a
-  // entrar a `handleSend`, ve `activeId` (todavía null en el closure de ese
-  // render) y crea una segunda conversación con el mismo mensaje. Fix
-  // sugerido: mover `setIsStreaming(true)` (o un guard equivalente, ej. un
-  // ref) al principio de `handleSend`, antes del primer `await`.
+  // NOTA: este test cubría un bug real que ya está corregido en la app
+  // (`handleSend` en src/app/page.tsx ahora hace `setIsStreaming(true)` ANTES
+  // del await que crea la conversación, así que el segundo click cae con el
+  // botón de enviar ya reemplazado por el de "Detener generación").
   test("F-CHAT-05: doble click rápido en Enviar no duplica el mensaje del usuario", async ({
     page,
   }) => {
@@ -89,19 +89,17 @@ test.describe("F-CHAT — Conversación", () => {
     const btn = sendButton(page);
 
     // Dos clicks disparados lo más rápido posible: el segundo debería
-    // encontrar el botón ya deshabilitado (anti doble-envío). Un botón
-    // <button disabled> no dispara el evento click en el navegador, así que
-    // si la app no se deshabilita a tiempo, este test lo va a detectar como
-    // un mensaje duplicado más abajo.
-    await Promise.all([btn.click(), btn.click().catch(() => {})]);
+    // encontrar el botón ya fuera del DOM (durante el streaming lo reemplaza
+    // el de "Detener generación"), así que se lo deja fallar con un timeout
+    // corto en vez de esperar el default de 30s.
+    await Promise.all([btn.click(), btn.click({ timeout: 2000 }).catch(() => {})]);
 
-    // Esperar a que termine el streaming (reaparece el ícono de flecha).
-    await expect(btn.locator("svg")).toBeVisible({ timeout: 90000 });
+    await waitForStreamEnd(page);
 
     // El mensaje del usuario debe aparecer una única vez dentro del área de
-    // mensajes, no duplicado (scopeado a `main`: el mismo texto también
-    // aparece una vez más como título en el sidebar, eso es esperado).
-    await expect(page.locator("main").getByText(text, { exact: true })).toHaveCount(1);
+    // mensajes, no duplicado (scopeado a las burbujas: el mismo texto también
+    // aparece como título del sidebar y del header, eso es esperado).
+    await expect(messageBubbles(page).getByText(text, { exact: true })).toHaveCount(1);
 
     expect(errors).toEqual([]);
   });
@@ -119,7 +117,7 @@ test.describe("F-CHAT — Conversación", () => {
 
     // Intentar "click" en un botón disabled no dispara el submit del form;
     // confirmamos que seguimos en el estado vacío (sin mensajes).
-    const bubbleCountBefore = await page.locator("main .msg-enter").count();
+    const bubbleCountBefore = await messageBubbles(page).count();
     expect(bubbleCountBefore).toBe(0);
 
     expect(errors).toEqual([]);
@@ -141,8 +139,8 @@ test.describe("F-CHAT — Conversación", () => {
     const modelSelect = page.locator("select");
     await expect(modelSelect).toBeEnabled();
 
-    // El estado vacío se muestra (placeholder "¿En qué piensas?").
-    await expect(page.getByText("¿En qué piensas?")).toBeVisible();
+    // El estado vacío se muestra (título "¿En qué estás pensando?").
+    await expect(page.getByText("¿En qué estás pensando?")).toBeVisible();
 
     // Verificamos vía API que no se creó ninguna fila nueva de conversación
     // sin título/mensaje real (todas las conversaciones existentes deben

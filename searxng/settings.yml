@@ -1,0 +1,43 @@
+# Configuración de SearXNG para la búsqueda web de orion-chat.
+#
+# IMPORTANTE: este archivo tiene que existir ANTES del primer `docker compose
+# up`. El entrypoint de la imagen solo copia su plantilla si el archivo no
+# está, y esa plantilla NO habilita el formato JSON — con lo cual la app
+# recibiría 403 en todas las búsquedas.
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "orion-chat"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  # La línea que hace que exista la API JSON. Por defecto SearXNG sirve solo
+  # HTML, y pedir ?format=json devuelve 403. No hay variable de entorno
+  # equivalente: hay que declararlo acá sí o sí.
+  formats:
+    - html
+    - json
+  # Los defaults suspenden un buscador 7 días ante un captcha y 15 ante
+  # Cloudflare. En una instancia de una sola persona eso equivale a quedarse
+  # sin resultados para siempre, así que los bajamos a minutos.
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+
+server:
+  # Lo pisa SEARXNG_SECRET del docker-compose.
+  secret_key: "cambiame"
+  # El limiter es detección de bots: bloquea con 429 cualquier llamada que no
+  # parezca un navegador de verdad. Como esto es una instancia privada
+  # atada a localhost, molesta más de lo que protege.
+  limiter: false
+  public_instance: false
+  image_proxy: false
+
+outgoing:
+  # El default de 3s se queda corto cuando SearXNG consulta varios buscadores
+  # y la app ya tiene su propio timeout de 8s por encima.
+  request_timeout: 6.0
+  max_request_timeout: 10.0

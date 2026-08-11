@@ -35,9 +35,11 @@ test.describe("F-RESP — Responsive (mobile)", () => {
     await expect(sidebar).toHaveClass(/translate-x-0/);
 
     // El backdrop es el div fixed inset-0 con aria-hidden="true" que cubre
-    // toda la pantalla (scopeado por clase: hay otro div aria-hidden ajeno
-    // al layout, un elemento decorativo de fondo, que no nos interesa).
-    const backdrop = page.locator('div.fixed.inset-0[aria-hidden="true"]');
+    // toda la pantalla. HALLAZGO: hoy se renderizan DOS backdrops idénticos
+    // superpuestos (uno en src/app/page.tsx y otro dentro de Sidebar.tsx),
+    // por eso se toma el último (el de Sidebar.tsx, que queda arriba en el
+    // orden de pintado) en vez de exigir que haya uno solo.
+    const backdrop = page.locator('div.fixed.inset-0[aria-hidden="true"]').last();
     await expect(backdrop).toBeVisible();
     await backdrop.click({ position: { x: 350, y: 20 } });
 

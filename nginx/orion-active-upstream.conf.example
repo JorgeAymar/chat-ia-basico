@@ -1,0 +1,5 @@
+# Plantilla inicial. En el VPS este archivo vive en
+# /etc/nginx/orion-active-upstream.conf (fuera del repo) y lo reescribe
+# deploy.sh en cada despliegue — el contenido real es siempre una sola
+# línea con el puerto del contenedor activo (3001 o 3002).
+server 127.0.0.1:3001;

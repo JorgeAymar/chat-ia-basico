@@ -24,7 +24,9 @@ test.describe("F-SETTINGS — Configuración", () => {
     await expect(textarea).toHaveValue(data.systemPrompt ?? "");
     expect((data.systemPrompt ?? "").length).toBeGreaterThan(0);
 
-    await page.getByRole("button", { name: "Cerrar" }).click();
+    // exact:true porque desde que existe el botón "Cerrar sesión" del
+    // sidebar, un match por substring ambiguaba con este × del modal.
+    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
 
     expect(errors).toEqual([]);
   });

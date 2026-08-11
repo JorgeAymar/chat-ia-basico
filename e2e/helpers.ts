@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 /**
- * Helpers compartidos por los specs E2E de Chat-IA.
+ * Helpers compartidos por los specs E2E de Orion Chat.
  * Nada acá está hardcodeado a un valor de negocio: todo lo que identifica un
  * mensaje/conversación/nota de memoria en un test se genera con un sufijo
  * único (timestamp + random) para poder correr los tests en paralelo o en
@@ -31,7 +31,10 @@ export function trackConsoleErrors(page: Page): string[] {
 /** Espera a que el selector de modelos tenga al menos una opción real (app "ready"). */
 export async function waitForModelsReady(page: Page) {
   const select = page.locator("select");
-  await expect(select.locator("option").first()).not.toHaveText("Sin modelos en .env", {
+  // Con `models` vacío el Composer renderiza una única opción placeholder
+  // ("Sin modelos instalados en Ollama"): que la primera opción NO sea esa
+  // es la señal de que /api/models ya respondió con modelos reales.
+  await expect(select.locator("option").first()).not.toHaveText(/Sin modelos/, {
     timeout: 15000,
   });
 }
@@ -41,30 +44,51 @@ export function sendButton(page: Page) {
   return page.getByRole("button", { name: "Enviar mensaje" });
 }
 
-/** Input de texto del composer, identificado por su placeholder cuando la app está lista. */
+/** Botón que corta el streaming; solo existe mientras la respuesta se genera. */
+export function stopButton(page: Page) {
+  return page.getByRole("button", { name: "Detener generación" });
+}
+
+/** Campo de texto del composer (hoy un <textarea>: Enter envía, Shift+Enter salta línea). */
 export function messageInput(page: Page) {
-  return page.getByPlaceholder("Escribe tu mensaje…");
+  return page.getByPlaceholder("Escribí tu mensaje…");
 }
 
 /**
- * Escribe un mensaje y lo envía, esperando a que termine el streaming
- * (el botón de enviar vuelve a estar disponible) antes de continuar.
- * Usa el propio estado del botón como señal, no un timeout fijo.
+ * Burbujas de mensaje del hilo activo. Se scopea acá y no a `main` a secas
+ * porque el header también muestra el título de la conversación, que es el
+ * texto del primer mensaje: buscar por texto en `main` matchea las dos cosas.
+ */
+export function messageBubbles(page: Page) {
+  return page.locator("main .msg-enter");
+}
+
+/**
+ * Espera a que termine el streaming de una respuesta usando el estado de la
+ * UI (no el contenido, que depende del modelo remoto): mientras genera, el
+ * botón de enviar es reemplazado por el de "Detener generación"; cuando
+ * termina, vuelve el de enviar.
+ */
+export async function waitForStreamEnd(page: Page, opts: { timeout?: number } = {}) {
+  const stop = stopButton(page);
+  // Si la respuesta es muy corta el botón de detener puede aparecer y
+  // desaparecer entre dos polls, así que no se falla por no haberlo visto:
+  // la condición que importa es la de abajo (ya no hay streaming activo).
+  await stop.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+  await expect(stop).toHaveCount(0, { timeout: opts.timeout ?? 120000 });
+  await expect(sendButton(page)).toBeVisible();
+}
+
+/**
+ * Escribe un mensaje y lo envía, esperando a que termine el streaming antes
+ * de continuar. Usa el estado de la UI como señal, no un timeout fijo.
  */
 export async function sendMessageAndWaitForReply(
   page: Page,
   text: string,
   opts: { timeout?: number } = {}
 ) {
-  const input = messageInput(page);
-  await input.fill(text);
-  const btn = sendButton(page);
-  await btn.click();
-  // Mientras streamea, el botón muestra un punto pulsante (think-dot) en vez
-  // del ícono de flecha (ver page.tsx: `isStreaming ? <span think-dot> : <svg>`).
-  // Como el input se vacía apenas se envía, el botón NO vuelve a habilitarse
-  // (sigue disabled por "sin texto"), así que la señal de "terminó de
-  // streamear" es que reaparezca el ícono de flecha (svg), no que se habilite.
-  await expect(btn.locator(".think-dot")).toBeVisible({ timeout: 5000 });
-  await expect(btn.locator("svg")).toBeVisible({ timeout: opts.timeout ?? 90000 });
+  await messageInput(page).fill(text);
+  await sendButton(page).click();
+  await waitForStreamEnd(page, opts);
 }

@@ -23,6 +23,10 @@ async function createConversation(page: import("@playwright/test").Page, label: 
 }
 
 test.describe("F-DEL — Borrado de conversaciones", () => {
+  // Estos tests esperan respuestas reales del Ollama remoto: el timeout por
+  // test de 30s del config no alcanza.
+  test.describe.configure({ timeout: 180_000 });
+
   test("F-DEL-01: el modal de borrado es propio de la app (role=alertdialog), no window.confirm", async ({
     page,
   }) => {
@@ -84,7 +88,7 @@ test.describe("F-DEL — Borrado de conversaciones", () => {
     await expect(page.locator("aside").getByText(title, { exact: true })).toHaveCount(0);
 
     // Como era la conversación activa, la vista vuelve al estado vacío.
-    await expect(page.getByText("¿En qué piensas?")).toBeVisible();
+    await expect(page.getByText("¿En qué estás pensando?")).toBeVisible();
 
     expect(errors).toEqual([]);
   });

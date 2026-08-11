@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.production.example
 
 # vercel
 .vercel
@@ -47,4 +48,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+# Cookies de la sesión de test que genera e2e/global-setup.ts.
+/e2e/.auth/
 .gstack/

@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUser, isAuthenticatedUser } from "@/lib/auth/dal";
 
 const MAX_MEMORY_CHARS = 500;
 const MAX_MEMORIES = 100;
 
 export async function GET() {
-  const memories = await prisma.memory.findMany({ orderBy: { createdAt: "desc" } });
+  const auth = await requireUser();
+  if (!isAuthenticatedUser(auth)) return auth;
+
+  const memories = await prisma.memory.findMany({
+    where: { userId: auth.id },
+    orderBy: { createdAt: "desc" },
+  });
   return NextResponse.json({ memories });
 }
 
 export async function POST(req: Request) {
+  const auth = await requireUser();
+  if (!isAuthenticatedUser(auth)) return auth;
+
   const body = await req.json().catch(() => null);
   const content = typeof body?.content === "string" ? body.content.trim() : "";
 
@@ -23,7 +33,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const count = await prisma.memory.count();
+  const count = await prisma.memory.count({ where: { userId: auth.id } });
   if (count >= MAX_MEMORIES) {
     return NextResponse.json(
       { error: `Máximo ${MAX_MEMORIES} notas de memoria` },
@@ -31,6 +41,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const memory = await prisma.memory.create({ data: { content } });
+  const memory = await prisma.memory.create({ data: { content, userId: auth.id } });
   return NextResponse.json({ memory });
 }

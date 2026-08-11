@@ -1,100 +1,164 @@
-# Chat-IA — chat local con Ollama
+# Orion Chat
 
-App de chat conectada a un modelo de Ollama corriendo en `localhost`, con historial de conversaciones persistido en Postgres. Proyecto personal, corre 100% en tu máquina (salvo que elijas explícitamente un modelo `-cloud` de Ollama).
+Chat conectado a Ollama, con historial persistido en Postgres y búsqueda web con citas vía SearXNG. Proyecto personal de un solo usuario, sin autenticación.
 
 ## Stack técnico
 
 - **Next.js 16** (App Router) + **React 19** + **TypeScript**
 - **Prisma 6** como ORM, cliente generado en `src/generated/prisma`
-- **Postgres 16** (contenedor Docker, no instalado en el sistema)
+- **Postgres 16** y **SearXNG**, ambos en contenedores Docker
 - **Tailwind CSS 4** para estilos
-- **Ollama** como backend de inferencia (API `/api/tags` y `/api/chat`), no incluido en el repo — se instala y corre aparte
-- Sin autenticación, sin multiusuario: es una app de un solo usuario
+- **Ollama** como backend de inferencia — local (`ollama serve`) o remoto detrás de un proxy con token
+- `react-markdown` + `remark-gfm` + `KaTeX` + `highlight.js` para el render de las respuestas
+- `unpdf` y `mammoth` para extraer texto de PDF y DOCX en el servidor
 
 ## Levantar la app desde cero
 
 ```bash
-# 1. Base de datos (Postgres en Docker, puerto 5435)
+# 1. Infraestructura: Postgres (5436) y SearXNG (8080)
 docker compose up -d
 
 # 2. Variables de entorno
 cp .env.example .env
-# revisá/ajustá DATABASE_URL, OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL
+# ajustá OLLAMA_BASE_URL y, si tu Ollama pide token, OLLAMA_API_KEY
 
-# 3. Migraciones de Prisma (crea las tablas)
+# 3. Migraciones de Prisma
 npx prisma migrate dev
 
-# 4. Ollama corriendo en local, con al menos un modelo instalado
+# 4. Ollama con al menos un modelo (si usás uno local)
 ollama serve
-ollama pull llama3   # o el modelo que prefieras
+ollama pull llama3
 
 # 5. Dependencias y servidor de desarrollo
 npm install
 npm run dev
 ```
 
-La app queda en `http://localhost:3000`.
+La app queda en `http://localhost:3000` (o el primer puerto libre).
 
-**Nota sobre el puerto de Postgres:** `docker-compose.yml` publica el contenedor en el puerto **5435** del host (no 5432 ni 5433), justamente para no chocar con otros Postgres que puedan estar corriendo en la máquina. `DATABASE_URL` en `.env.example` ya apunta a `localhost:5435`.
+**Puertos:** Postgres se publica en el **5436** del host y SearXNG en el **8080**, atado a `127.0.0.1`. El 5436 se eligió porque 5432/5433/5435 suelen estar tomados por otros proyectos.
 
 ## Variables de entorno (`.env`)
 
 | Variable | Qué hace |
 |---|---|
-| `DATABASE_URL` | Cadena de conexión a Postgres. Por defecto `postgresql://chatuser:chatpass@localhost:5435/chat_ia_basico?schema=public`, coincide con las credenciales del `docker-compose.yml`. |
-| `OLLAMA_BASE_URL` | URL base del servidor Ollama. Por defecto `http://localhost:11434`. |
-| `OLLAMA_DEFAULT_MODEL` | Modelo preseleccionado al abrir la app, **solo si está instalado** en Ollama. Opcional: si no está seteado o el modelo no existe, se usa el primero que devuelva Ollama. |
+| `NEXT_PUBLIC_APP_NAME` | Nombre que muestra la UI y la pestaña del navegador. |
+| `NEXT_PUBLIC_APP_VERSION` | Versión que se muestra junto al nombre en el sidebar. |
+| `DATABASE_URL` | Conexión a Postgres. Por defecto apunta a `localhost:5436`, que coincide con `docker-compose.yml`. |
+| `OLLAMA_BASE_URL` | URL de Ollama. Puede ser `http://localhost:11434` o un host remoto. |
+| `OLLAMA_API_KEY` | Token bearer, solo si Ollama está detrás de un proxy que lo exige. Vacío con Ollama local. |
+| `OLLAMA_DEFAULT_MODEL` | Modelo preseleccionado al abrir la app, si está instalado. Opcional. |
+| `SEARXNG_BASE_URL` | URL de SearXNG. Si no está levantado, el botón de búsqueda avisa y el chat responde igual sin buscar. |
 
-**Importante — esto cambió recientemente:** la lista de modelos disponibles en el selector **ya no se configura por `.env`**. Antes existía una variable tipo `OLLAMA_MODELS` como allow-list; ya no se usa. Hoy la app llama en vivo a `GET /api/tags` de Ollama (equivalente a `ollama list`) cada vez que carga, así que si hacés `ollama pull`/`ollama rm` los cambios se reflejan al instante sin tocar código ni reiniciar nada. Si ves referencias a `OLLAMA_MODELS` en documentación vieja, son obsoletas.
+Las dos `NEXT_PUBLIC_*` las incrusta Next en el bundle al compilar, así que después de cambiarlas hay que reiniciar el servidor: recargar el navegador no alcanza.
+
+La lista de modelos del selector **no se configura por `.env`**: sale en vivo de `GET /api/tags` de Ollama en cada carga, así que `ollama pull`/`ollama rm` se reflejan al instante.
 
 ## Funcionalidades
 
-- **Chat con streaming**: las respuestas del modelo se van mostrando token por token (vía `ReadableStream`, sin WebSockets).
-- **Historial persistente**: cada conversación se guarda en Postgres con título auto-generado a partir del primer mensaje del usuario (truncado a 45 caracteres, o `📎 nombre-archivo` si el primer mensaje solo trae adjuntos).
-- **Adjuntar archivos**: hasta 5 por mensaje.
-  - Texto/código (`.md`, `.json`, `.csv`, `.log`, `.js`, `.ts`, `.py`, etc.): máx. 300KB por archivo en el navegador, y se trunca a 20.000 caracteres antes de mandarlo al modelo. Se inyecta como bloque citado en el mensaje.
-  - Imágenes: máx. 5MB por archivo, se codifican en base64 y se mandan al array `images` de la API multimodal de Ollama.
-- **Borrar conversaciones**: botón de papelera por conversación en el historial, con un modal de confirmación propio (no `window.confirm`) que avisa que la acción no se puede deshacer.
-- **Indicador de conexión con Ollama**: punto verde/rojo en la sidebar (conectado/desconectado), más la URL de Ollama detectada debajo del título.
-- **Aviso de modelo cloud**: si el modelo activo termina en `-cloud`/`:cloud` (modelos que Ollama proxea hacia sus propios servidores), la UI muestra la etiqueta de texto "(cloud)" en el selector y un texto explícito avisando que ese chat sí sale de la máquina — a diferencia de los modelos locales.
-- **Configuración (botón de engranaje ⚙)**:
-  - **Prompt de sistema**: editable desde la UI, se persiste en el archivo `SYSTEM_PROMPT.md` en la raíz del proyecto (no en la base de datos). Se envía como mensaje `role: system` en cada llamada a Ollama.
-  - **Memoria persistente**: notas de texto libre (máx. 500 caracteres, máx. 100 notas) que se guardan en Postgres (`Memory`) y se recuerdan en **todas** las conversaciones, no solo en la actual. Se agregan al prompt de sistema como una lista con encabezado "Cosas que sabés sobre el usuario".
+### Conversación
+
+- **Streaming con eventos tipados.** El endpoint de chat devuelve NDJSON —un evento JSON por línea— en vez de texto plano, porque en el mismo stream conviven cuatro cosas distintas: tokens, razonamiento, fuentes web y avisos de progreso. El protocolo está en `src/lib/stream.ts`.
+- **Markdown completo** en las respuestas: encabezados, listas, tablas, citas, fórmulas con KaTeX y bloques de código con resaltado de sintaxis y botón de copiar.
+- **Detener la generación** a mitad de camino. Lo generado hasta ese momento se guarda igual: media respuesta útil es mejor que perderla.
+- **Regenerar** una respuesta y **editar** un mensaje ya enviado. Ambas cosas recortan la conversación hasta ese punto y vuelven a generar desde ahí.
+- **Copiar** cualquier respuesta al portapapeles.
+- **Bloque de razonamiento plegable** para los modelos que piensan (deepseek-r1, qwen3, gpt-oss). Se muestra abierto mientras se genera y se pliega solo al terminar. El razonamiento se guarda en su propia columna y **no** se reinyecta como contexto en los turnos siguientes: infla el prompt y hace que el modelo lea su propio borrador como si fuera la respuesta.
+- **Composer multilínea**: Enter envía, Shift+Enter salta de línea, y el campo crece con el texto hasta 200px.
+- **Cambiar de modelo a mitad de conversación**, y el cambio se persiste.
+
+### Búsqueda web con citas
+
+El botón del globo en el composer activa la búsqueda. El servidor consulta SearXNG, se queda con el mejor resultado por dominio (si no, seis páginas del mismo sitio copan las citas), inyecta los extractos numerados en el prompt y le pide al modelo que cite con marcadores `[1]`, `[2]`. Esos marcadores se convierten en enlaces a las fuentes, y debajo de la respuesta aparece la lista completa con título, dominio y extracto.
+
+Si SearXNG no responde, se avisa y el modelo contesta igual con lo que sabe: la búsqueda nunca puede romper el chat.
+
+### Archivos adjuntos
+
+Hasta 5 por mensaje.
+
+| Tipo | Límite | Cómo se procesa |
+|---|---|---|
+| Texto y código (`.md`, `.json`, `.ts`, `.py`…) | 300KB | Se lee en el navegador, se trunca a 20.000 caracteres |
+| Imágenes | 5MB | Base64 al array `images` de la API multimodal de Ollama |
+| **PDF** | 10MB / 150 páginas | Se extrae en el servidor con `unpdf`, marcando cada página |
+| **DOCX** | 10MB | Se extrae en el servidor con `mammoth` |
+
+El truncado de documentos corta por página o sección, nunca a mitad de palabra, y deja una marca explícita de lo que quedó afuera para que el modelo sepa que no tiene todo. Si un PDF no tiene capa de texto (escaneado), se rechaza con un mensaje accionable en vez de mandarle una cadena vacía al modelo, que lo llevaría a inventar.
+
+### Historial
+
+- **Buscar** en el historial, tanto por título como por el contenido de los mensajes: el título sale del primer mensaje y casi nunca resume bien lo que se terminó hablando.
+- **Fijar** conversaciones arriba de todo.
+- **Renombrar** con doble clic sobre el título.
+- **Borrar** con un modal de confirmación propio.
+- **Exportar** la conversación a Markdown, con las fuentes incluidas.
+
+### Configuración (⚙)
+
+- **Prompt de sistema** editable, persistido en `SYSTEM_PROMPT.md`.
+- **Memoria persistente**: notas de texto libre que el asistente recuerda en todas las conversaciones, no solo en la actual.
+
+### Privacidad
+
+La app es explícita sobre dónde corre el modelo, porque no siempre puede prometer que el chat se queda en tu máquina:
+
+- Ollama en localhost con un modelo local → el badge dice **local**.
+- Ollama en un host remoto → dice **remoto**, y el encabezado aclara que los mensajes salen de tu máquina, aunque el modelo no se llame `-cloud`.
+- Modelos `-cloud`/`:cloud` → Ollama los proxea a sus propios servidores, y la UI lo avisa.
+
+Con la búsqueda web activada, la consulta sale hacia SearXNG y de ahí a los buscadores.
 
 ## Estructura del proyecto
 
 ```
 src/
   app/
-    page.tsx                       UI completa: sidebar/historial, composer, adjuntos,
-                                    modal de borrado, modal de configuración, selector de modelo
-    layout.tsx                     layout raíz, fuentes (IBM Plex Sans + Plus Jakarta Sans), metadata
-    globals.css                    estilos globales / variables de tema (Tailwind 4)
+    page.tsx                       Orquestador: estado, streaming, acciones
+    layout.tsx                     Layout raíz, fuentes, CSS de KaTeX
+    globals.css                    Tema, estilos de Markdown y del resaltado
     api/
-      models/route.ts              GET: modelos detectados en vivo desde Ollama + modelo por defecto
-      conversations/route.ts       GET lista de conversaciones / POST crea una nueva
-      conversations/[id]/route.ts  GET detalle con mensajes / DELETE borra la conversación
-      chat/route.ts                POST: arma el historial, llama a Ollama en streaming, persiste
-                                    el mensaje del usuario y la respuesta del asistente
-      settings/route.ts            GET/PUT del prompt de sistema (lee/escribe SYSTEM_PROMPT.md)
-      memory/route.ts              GET lista de notas de memoria / POST agrega una
-      memory/[id]/route.ts         DELETE borra una nota de memoria
+      models/route.ts              GET modelos en vivo desde Ollama
+      conversations/route.ts       GET lista (con búsqueda) / POST crear
+      conversations/[id]/route.ts  GET detalle / PATCH renombrar-fijar-modelo / DELETE
+      chat/route.ts                POST: búsqueda web, streaming NDJSON, persistencia
+      upload/route.ts              POST: extrae texto de PDF y DOCX
+      settings/route.ts            GET/PUT del prompt de sistema
+      memory/route.ts              GET/POST de las notas de memoria
+      memory/[id]/route.ts         DELETE de una nota
+  components/
+    Markdown.tsx                   Render memoizado por bloque + código con copiar
+    ChatMessage.tsx                Burbuja, adjuntos y acciones del mensaje
+    Composer.tsx                   Campo multilínea, adjuntos, búsqueda, modelo
+    Sidebar.tsx                    Historial con búsqueda, fijadas y renombrado
+    Sources.tsx                    Lista de fuentes citadas
+    ThinkingBlock.tsx              Razonamiento plegable
+    SettingsModal.tsx              Prompt de sistema y memoria
   lib/
-    ollama.ts                      cliente de Ollama: detección de modelos (/api/tags), streaming
-                                    de /api/chat (NDJSON → texto plano), armado de mensajes multimodales
-    settings.ts                    lectura/escritura de SYSTEM_PROMPT.md con prompt por defecto
-    prisma.ts                      instancia singleton de PrismaClient
-  generated/prisma/                cliente de Prisma generado (no editar a mano)
-prisma/
-  schema.prisma                    modelos Conversation, Message, Memory
-  migrations/                      migraciones de Prisma
-docker-compose.yml                 contenedor de Postgres 16 (puerto host 5435)
-.env.example                       plantilla de variables de entorno
-SYSTEM_PROMPT.md                   prompt de sistema activo (editable desde la app o a mano)
+    stream.ts                      Protocolo NDJSON y separador de <think>
+    ollama.ts                      Cliente de Ollama (modelos y streaming)
+    search.ts                      Cliente de SearXNG y armado del contexto
+    documents.ts                   Extracción de PDF y DOCX
+    markdown-blocks.ts             Corte en bloques para memoizar el streaming
+    model-utils.ts, settings.ts, prisma.ts, types.ts
+searxng/settings.yml               Config de SearXNG (leé el comentario de arriba)
 ```
 
-## Modelo de datos (Prisma)
+## Tests
 
-- **`Conversation`**: `id`, `title` (default `"Nueva conversación"`), `model` (nombre del modelo Ollama usado), `createdAt`, `updatedAt`, y su relación `messages`. Se crea recién al enviar el primer mensaje (no al hacer clic en "Nueva conversación"), para no dejar filas vacías.
-- **`Message`**: `id`, `conversationId`, `role` (`user` | `assistant`), `content`, `model` (opcional, se guarda en los mensajes del asistente), `attachments` (JSON opcional — array de `{ name, kind: "text"|"image", mimeType, content }`), `createdAt`. Se borra en cascada al borrar la conversación.
-- **`Memory`**: `id`, `content`, `createdAt`. Notas sueltas, sin relación con ninguna conversación — es memoria global del asistente, independiente del historial.
+```bash
+npm test         # unitarios con Jest
+npm run test:e2e # end-to-end con Playwright
+```
+
+## Detalles de implementación que vale conocer
+
+**El streaming se corta en bloques para memoizar.** Si se le pasa el mensaje entero a `react-markdown` en cada token, vuelve a parsear todo el texto cada vez: es cuadrático y se nota como tirones. `markdown-blocks.ts` parte el Markdown en bloques de nivel superior —respetando los bloques de código, donde una línea en blanco no separa nada— y solo se re-parsea el último.
+
+**Los bloques de código sin cerrar se cierran de mentira mientras llegan.** Si no, el fence abierto se renderiza como párrafo con los backticks a la vista y salta a bloque de código de golpe cuando llega el cierre.
+
+**Las etiquetas `<think>` llegan partidas entre chunks.** El `ThinkingSplitter` nunca emite la cola del buffer que todavía podría ser el principio de una etiqueta, así que nunca se ve un `<thi` suelto en pantalla.
+
+**Ollama reporta errores a mitad de stream con HTTP 200.** Cuando falla después de empezar a responder, manda una línea suelta `{"error":"..."}` dentro del NDJSON. Ignorarla haría que el chat corte a mitad de frase sin explicar por qué, así que se convierte en excepción y llega al cliente como evento de error.
+
+**Un Ollama caído no debe parecer un modelo desinstalado.** La validación del modelo solo rechaza si Ollama efectivamente devolvió su lista y el modelo no está en ella; si no respondió, se sigue y el error real lo reporta la llamada de chat.

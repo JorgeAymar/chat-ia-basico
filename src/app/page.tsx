@@ -1,41 +1,53 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { shortModel, isCloudModel } from "@/lib/model-utils";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { isCloudModel } from "@/lib/model-utils";
+import { createEventDecoder, type Source } from "@/lib/stream";
+import type { AppUser, Attachment, Conversation, CurrentUser, Memory, Message } from "@/lib/types";
+import { ChatMessage } from "@/components/ChatMessage";
+import { Composer } from "@/components/Composer";
+import { Sidebar } from "@/components/Sidebar";
+import { SettingsModal } from "@/components/SettingsModal";
+import { ShortcutsModal } from "@/components/ShortcutsModal";
+import { hasShortcutModifier, isTypingTarget } from "@/lib/shortcuts";
 
-type Role = "user" | "assistant";
-
-type Attachment = {
-  name: string;
-  kind: "text" | "image";
-  mimeType: string;
-  content: string;
-};
-
-type Message = {
-  id: string;
-  role: Role;
-  content: string;
-  attachments?: Attachment[];
-};
-
-type Conversation = {
-  id: string;
-  title: string;
-  model: string;
-  updatedAt: string;
-};
-
-type Memory = {
-  id: string;
-  content: string;
-  createdAt: string;
-};
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
-const MAX_TEXT_BYTES = 300 * 1024; // 300KB
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_TEXT_BYTES = 300 * 1024;
 const MAX_TEXT_CHARS_IN_PROMPT = 20_000;
 const MAX_ATTACHMENTS = 5;
+
+// PDF y DOCX no se pueden leer en el navegador: van al servidor, que tiene
+// unpdf y mammoth. El resto (texto plano, imágenes) se lee acá y evita un
+// viaje de ida y vuelta.
+const SERVER_PARSED = /\.(pdf|docx)$/i;
+
+const SUGGESTIONS = [
+  "Explicame qué hace este código y dónde puede fallar",
+  "¿Qué salió esta semana en el mundo de la IA?",
+  "Ayudame a escribir un correo pidiendo una reunión",
+  "Compará Postgres y SQLite para un proyecto chico",
+];
+
+// Lo que el listener global de atajos necesita saber en el momento en que se
+// aprieta la tecla. Vive en un ref (ver más abajo) y no en el closure del
+// efecto.
+type ShortcutState = {
+  isStreaming: boolean;
+  settingsOpen: boolean;
+  shortcutsOpen: boolean;
+  confirmDeleteOpen: boolean;
+  send: () => void;
+  stop: () => void;
+  newConversation: () => void;
+  focusSearch: () => void;
+  toggleSidebar: () => void;
+  toggleShortcuts: () => void;
+  closeShortcuts: () => void;
+  closeDelete: () => void;
+};
+
+const subscribeToNothing = () => () => {};
+const getIsMac = () => /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 
 function readFileAsAttachment(file: File): Promise<Attachment> {
   const isImage = file.type.startsWith("image/");
@@ -76,11 +88,19 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaUrl, setOllamaUrl] = useState<string | null>(null);
+  const [ollamaRemote, setOllamaRemote] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [systemPromptDraft, setSystemPromptDraft] = useState("");
@@ -90,12 +110,34 @@ export default function Home() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
+  // Sesión actual. No hace falta redirigir a /login si viene null: el
+  // proxy ya garantiza que nadie sin sesión llega a renderizar esta página.
+  // Se usa solo para mostrar quién es y, si es owner, habilitar "Usuarios".
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [newInviteEmail, setNewInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const deleteModalRef = useRef<HTMLDivElement>(null);
-  const settingsModalRef = useRef<HTMLDivElement>(null);
   const deleteTriggerRef = useRef<HTMLElement | null>(null);
   const settingsTriggerRef = useRef<HTMLElement | null>(null);
+  const shortcutsTriggerRef = useRef<HTMLElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const shortcutStateRef = useRef<ShortcutState | null>(null);
+  // Vive en un ref y no en estado porque cortar el stream no tiene que
+  // provocar un re-render por sí mismo.
+  const abortRef = useRef<AbortController | null>(null);
+
+  const refreshConversations = useCallback(async (query = "") => {
+    const url = query ? `/api/conversations?q=${encodeURIComponent(query)}` : "/api/conversations";
+    const res = await fetch(url);
+    const data = await res.json();
+    setConversations(data.conversations ?? []);
+  }, []);
 
   useEffect(() => {
     fetch("/api/models")
@@ -105,6 +147,7 @@ export default function Home() {
         setSelectedModel(data.defaultModel ?? "");
         setOllamaOnline(data.source === "ollama");
         setOllamaUrl(data.baseUrl ?? null);
+        setOllamaRemote(Boolean(data.remote));
         if (data.error) setError(data.error);
       })
       .catch(() => {
@@ -112,29 +155,36 @@ export default function Home() {
         setError("No se pudo conectar con Ollama para detectar modelos");
       });
 
-    refreshConversations();
+    // El proxy ya garantiza que solo llega acá quien tiene sesión: esto no
+    // es un chequeo de acceso, es solo para saber quién es y si es owner.
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => setCurrentUser(data.user ?? null))
+      .catch(() => setCurrentUser(null));
   }, []);
+
+  // La búsqueda del historial pega contra el servidor (busca también dentro
+  // del contenido de los mensajes), así que se espera a que el usuario deje
+  // de tipear en vez de disparar una query por tecla.
+  //
+  // Este mismo efecto hace la carga inicial del historial: con `search` en
+  // "" el primer disparo trae la lista completa, y así no hay dos caminos
+  // distintos que pisen el mismo estado.
+  useEffect(() => {
+    const timer = setTimeout(() => refreshConversations(search), search ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [search, refreshConversations]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    if (confirmDeleteId === null && !settingsOpen) return;
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Escape") return;
-      if (confirmDeleteId !== null) {
-        closeDeleteModal();
-      } else if (settingsOpen) {
-        closeSettingsModal();
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmDeleteId, settingsOpen]);
+  // La plataforma no se puede leer durante el render: el servidor no tiene
+  // `navigator` y pintaría "Ctrl" donde el cliente pinta "⌘", lo que rompe la
+  // hidratación. useSyncExternalStore es la salida prevista para eso: usa el
+  // snapshot del servidor para el HTML inicial y recién después lee el del
+  // cliente. La plataforma no cambia, así que no hay a qué suscribirse.
+  const isMac = useSyncExternalStore(subscribeToNothing, getIsMac, () => false);
 
   function handleModalTabTrap(e: React.KeyboardEvent, containerRef: React.RefObject<HTMLDivElement | null>) {
     if (e.key !== "Tab") return;
@@ -162,24 +212,133 @@ export default function Home() {
     deleteTriggerRef.current?.focus();
   }
 
-  function closeSettingsModal() {
-    setSettingsOpen(false);
-    settingsTriggerRef.current?.focus();
+  function openShortcuts(e?: React.MouseEvent) {
+    shortcutsTriggerRef.current =
+      (e?.currentTarget as HTMLElement) ?? (document.activeElement as HTMLElement | null);
+    setShortcutsOpen(true);
   }
 
-  async function refreshConversations() {
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-    setConversations(data.conversations ?? []);
+  function closeShortcuts() {
+    setShortcutsOpen(false);
+    shortcutsTriggerRef.current?.focus();
   }
+
+  function focusSearch() {
+    setSidebarCollapsed(false);
+    setSidebarOpen(true);
+    // El buscador puede estar dentro de un sidebar oculto: enfocarlo antes de
+    // que el panel vuelva a pintarse no haría nada.
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }
+
+  function toggleSidebar() {
+    // El sidebar se esconde distinto según el ancho (en móvil es un panel
+    // encima, en escritorio una columna), así que el atajo tiene que saber
+    // cuál de los dos estados mover.
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setSidebarCollapsed((v) => !v);
+    } else {
+      setSidebarOpen((v) => !v);
+    }
+  }
+
+  // Se refresca después de cada commit para que el listener —registrado una
+  // sola vez— siempre lea el estado actual. Sin esto habría que elegir entre
+  // re-suscribir el listener en cada tecla o quedarse con un closure viejo,
+  // donde `isStreaming` sigue en false y Escape nunca corta la generación.
+  useEffect(() => {
+    shortcutStateRef.current = {
+      isStreaming,
+      settingsOpen,
+      shortcutsOpen,
+      confirmDeleteOpen: confirmDeleteId !== null,
+      send: handleSend,
+      stop: handleStop,
+      newConversation: handleNewConversation,
+      focusSearch,
+      toggleSidebar,
+      toggleShortcuts: () => (shortcutsOpen ? closeShortcuts() : openShortcuts()),
+      closeShortcuts,
+      closeDelete: closeDeleteModal,
+    };
+  });
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const state = shortcutStateRef.current;
+      if (!state) return;
+
+      if (e.key === "Escape") {
+        // Los diálogos abiertos mandan. El de configuración cierra con su
+        // propio Escape, así que acá solo se corta para no encadenar otra
+        // acción con la misma tecla.
+        if (state.settingsOpen) return;
+        if (state.shortcutsOpen) {
+          state.closeShortcuts();
+          return;
+        }
+        if (state.confirmDeleteOpen) {
+          state.closeDelete();
+          return;
+        }
+        if (state.isStreaming) {
+          state.stop();
+          return;
+        }
+        const active = document.activeElement;
+        if (isTypingTarget(active)) (active as HTMLElement).blur();
+        return;
+      }
+
+      if (!hasShortcutModifier(e)) return;
+
+      // Con un diálogo abierto ningún atajo se dispara: no tiene sentido
+      // mandar un mensaje o abrir una conversación nueva detrás del modal que
+      // el usuario está mirando.
+      if (state.settingsOpen || state.shortcutsOpen || state.confirmDeleteOpen) return;
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        state.send();
+        return;
+      }
+
+      // Fuera de ⌘+Enter y Escape, nada se dispara mientras se escribe: en un
+      // campo de texto esas teclas ya tienen dueño (⌘+B en negrita, ⌘+/ en un
+      // comentario) y robarlas sorprende.
+      if (isTypingTarget(e.target)) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "k") {
+        e.preventDefault();
+        state.focusSearch();
+      } else if (key === "o" && e.shiftKey) {
+        e.preventDefault();
+        state.newConversation();
+      } else if (key === "b") {
+        e.preventDefault();
+        state.toggleSidebar();
+      } else if (key === "/" || e.code === "Slash") {
+        e.preventDefault();
+        state.toggleShortcuts();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   function handleNewConversation() {
-    // No crea nada todavía: la conversación real se crea recién en
-    // handleSend, al enviar el primer mensaje. Así el modelo queda libre
-    // para cambiarse y no quedan filas vacías en Postgres.
+    // No crea nada todavía: la conversación real se crea recién al enviar el
+    // primer mensaje, así el modelo queda libre para cambiarse y no quedan
+    // filas vacías en Postgres.
     setError(null);
     setMessages([]);
     setActiveId(null);
+    setPendingAttachments([]);
     setSidebarOpen(false);
   }
 
@@ -211,7 +370,42 @@ export default function Home() {
       setActiveId(null);
       setMessages([]);
     }
-    await refreshConversations();
+    await refreshConversations(search);
+  }
+
+  async function handleTogglePin(id: string, pinned: boolean) {
+    // Optimista: fijar tiene que sentirse instantáneo, y si falla el próximo
+    // refresco devuelve la lista al estado real.
+    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, pinned } : c)));
+    await fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned }),
+    });
+    await refreshConversations(search);
+  }
+
+  async function handleRename(id: string, title: string) {
+    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)));
+    await fetch(`/api/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    await refreshConversations(search);
+  }
+
+  async function handleSelectModel(model: string) {
+    setSelectedModel(model);
+    // Cambiar de modelo a mitad de conversación se persiste: si no, al
+    // recargar volvería al modelo con el que arrancó la charla.
+    if (activeId) {
+      await fetch(`/api/conversations/${activeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model }),
+      });
+    }
   }
 
   async function handleOpenSettings(e?: React.MouseEvent) {
@@ -219,6 +413,8 @@ export default function Home() {
     setSettingsOpen(true);
     setSettingsError(null);
     setSettingsLoading(true);
+    setInviteError(null);
+    setInviteSuccessMessage(null);
     try {
       const [settingsRes, memoriesRes] = await Promise.all([
         fetch("/api/settings"),
@@ -234,6 +430,59 @@ export default function Home() {
     } finally {
       setSettingsLoading(false);
     }
+
+    // La lista de usuarios solo la puede ver (ni pedir) alguien que no sea
+    // owner: pedirla igual solo generaría un 403 inútil.
+    if (currentUser?.role === "OWNER") {
+      setUsersLoading(true);
+      try {
+        const res = await fetch("/api/auth/invite");
+        const data = await res.json();
+        setUsers(data.users ?? []);
+      } catch {
+        // Silencioso: la sección de usuarios ya tiene su propio estado de
+        // carga vacío, y esto no es crítico para el resto del modal.
+      } finally {
+        setUsersLoading(false);
+      }
+    }
+  }
+
+  async function handleInvite() {
+    const email = newInviteEmail.trim();
+    if (!email) return;
+    setInviting(true);
+    setInviteError(null);
+    setInviteSuccessMessage(null);
+    try {
+      const res = await fetch("/api/auth/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "No se pudo enviar la invitación");
+      setUsers((prev) => [data.user, ...prev.filter((u) => u.id !== data.user.id)]);
+      setInviteSuccessMessage(`Invitación enviada a ${data.user.email}`);
+      setNewInviteEmail("");
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "No se pudo enviar la invitación");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    // El proxy hace el resto: al no encontrar sesión en la próxima carga,
+    // manda a /login. Un location.href fuerza esa carga completa (no un
+    // router.push de cliente, que dejaría estado viejo en memoria).
+    window.location.href = "/login";
+  }
+
+  function closeSettingsModal() {
+    setSettingsOpen(false);
+    settingsTriggerRef.current?.focus();
   }
 
   async function handleSaveSystemPrompt() {
@@ -288,8 +537,27 @@ export default function Home() {
       setError(`Solo se admiten hasta ${MAX_ATTACHMENTS} archivos por mensaje`);
     }
 
-    const read: Attachment[] = [];
     for (const file of selected) {
+      if (SERVER_PARSED.test(file.name)) {
+        setUploading(true);
+        try {
+          const form = new FormData();
+          form.append("file", file);
+          const res = await fetch("/api/upload", { method: "POST", body: form });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error ?? `No se pudo procesar "${file.name}"`);
+          setPendingAttachments((prev) => [...prev, data.attachment]);
+          if (data.truncated) {
+            setError(`"${file.name}" es muy largo: se adjuntó solo la primera parte.`);
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : `No se pudo procesar "${file.name}"`);
+        } finally {
+          setUploading(false);
+        }
+        continue;
+      }
+
       const isImage = file.type.startsWith("image/");
       const limit = isImage ? MAX_IMAGE_BYTES : MAX_TEXT_BYTES;
       if (file.size > limit) {
@@ -297,530 +565,431 @@ export default function Home() {
         continue;
       }
       try {
-        read.push(await readFileAsAttachment(file));
+        const attachment = await readFileAsAttachment(file);
+        setPendingAttachments((prev) => [...prev, attachment]);
       } catch (err) {
         setError(err instanceof Error ? err.message : `No se pudo leer "${file.name}"`);
       }
     }
-    setPendingAttachments((prev) => [...prev, ...read]);
   }
 
   function handleRemoveAttachment(name: string) {
     setPendingAttachments((prev) => prev.filter((a) => a.name !== name));
   }
 
+  function handleStop() {
+    abortRef.current?.abort();
+  }
+
+  // Motor único de generación: lo usan enviar, regenerar y editar. La
+  // diferencia entre los tres son solo los campos del body y qué mensajes
+  // se sacan de la lista antes de arrancar.
+  const runGeneration = useCallback(
+    async (
+      conversationId: string,
+      body: Record<string, unknown>,
+      optimistic: { user?: Message } = {}
+    ) => {
+      const assistantId = `local-${Date.now()}-assistant`;
+      setMessages((prev) => [
+        ...prev,
+        ...(optimistic.user ? [optimistic.user] : []),
+        { id: assistantId, role: "assistant", content: "" },
+      ]);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setError(null);
+      setStatus(null);
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId, ...body }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? "Error hablando con Ollama");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        const decodeEvents = createEventDecoder();
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          for (const event of decodeEvents(decoder.decode(value, { stream: true }))) {
+            if (event.type === "status") {
+              setStatus(event.text || null);
+            } else if (event.type === "error") {
+              setError(event.message);
+            } else if (event.type === "sources") {
+              const sources: Source[] = event.sources;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, sources } : m))
+              );
+            } else if (event.type === "thinking") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, thinking: (m.thinking ?? "") + event.text } : m
+                )
+              );
+            } else if (event.type === "thinking-done") {
+              // Llega apenas arranca el contenido visible, no al final de la
+              // respuesta: así el encabezado pasa de "Pensando…" a "Pensó N s"
+              // mientras el resto de la respuesta todavía se está generando.
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, thinkingMs: event.ms } : m))
+              );
+            } else if (event.type === "token") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, content: m.content + event.text } : m
+                )
+              );
+            }
+          }
+        }
+      } catch (err) {
+        // Abortar es una acción del usuario, no un error que mostrarle.
+        if ((err as Error)?.name !== "AbortError") {
+          setError(err instanceof Error ? err.message : "Error desconocido");
+        }
+      } finally {
+        abortRef.current = null;
+        setIsStreaming(false);
+        setStatus(null);
+        refreshConversations(search);
+      }
+    },
+    [refreshConversations, search]
+  );
+
+  async function ensureConversation(): Promise<string | null> {
+    if (activeId) return activeId;
+    const res = await fetch("/api/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: selectedModel }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "No se pudo crear la conversación");
+      return null;
+    }
+    setActiveId(data.conversation.id);
+    await refreshConversations(search);
+    return data.conversation.id as string;
+  }
+
   async function handleSend() {
     if ((!input.trim() && pendingAttachments.length === 0) || isStreaming) return;
-    // Se activa ACÁ, antes de cualquier await: si no, la ventana async de
-    // crear la conversación (cuando todavía no hay activeId) deja el botón
-    // habilitado y un segundo click re-entra a handleSend, creando una
-    // conversación duplicada con el mismo primer mensaje.
+    // Se activa acá, antes del primer await: si no, la ventana asíncrona de
+    // crear la conversación deja el botón habilitado y un segundo clic
+    // duplica la conversación con el mismo primer mensaje.
     setIsStreaming(true);
 
-    let conversationId = activeId;
+    const conversationId = await ensureConversation();
     if (!conversationId) {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: selectedModel }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "No se pudo crear la conversación");
-        setIsStreaming(false);
-        return;
-      }
-      conversationId = data.conversation.id;
-      setActiveId(conversationId);
-      await refreshConversations();
+      setIsStreaming(false);
+      return;
     }
 
     const userText = input;
     const attachments = pendingAttachments;
     setInput("");
     setPendingAttachments([]);
-    setError(null);
-    setMessages((prev) => [
-      ...prev,
-      { id: `local-${Date.now()}`, role: "user", content: userText, attachments },
-    ]);
 
-    const assistantId = `local-${Date.now()}-assistant`;
-    setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, message: userText, attachments }),
-      });
-
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Error hablando con Ollama");
+    await runGeneration(
+      conversationId,
+      { message: userText, attachments, webSearch },
+      {
+        user: {
+          id: `local-${Date.now()}`,
+          role: "user",
+          content: userText,
+          attachments,
+        },
       }
+    );
+  }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
+  async function handleRegenerate(messageId: string) {
+    if (!activeId || isStreaming) return;
+    setIsStreaming(true);
+    // El mensaje del asistente que se rehace y todo lo posterior desaparecen
+    // de la vista antes de pedir la respuesta nueva; el servidor los borra
+    // de la base en el mismo pedido.
+    const index = messages.findIndex((m) => m.id === messageId);
+    if (index !== -1) setMessages(messages.slice(0, index));
+    await runGeneration(activeId, { regenerateFrom: messageId, webSearch });
+  }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: m.content + chunk } : m
-          )
-        );
+  async function handleEdit(messageId: string, newText: string) {
+    if (!activeId || isStreaming || !newText.trim()) return;
+    setIsStreaming(true);
+    const index = messages.findIndex((m) => m.id === messageId);
+    const original = messages[index];
+    if (index !== -1) setMessages(messages.slice(0, index));
+    await runGeneration(
+      activeId,
+      {
+        editMessageId: messageId,
+        message: newText,
+        attachments: original?.attachments ?? [],
+        webSearch,
+      },
+      {
+        user: {
+          id: `local-${Date.now()}`,
+          role: "user",
+          content: newText,
+          attachments: original?.attachments ?? [],
+        },
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
-    } finally {
-      setIsStreaming(false);
-      refreshConversations();
-    }
+    );
+  }
+
+  function handleExport() {
+    const conversation = conversations.find((c) => c.id === activeId);
+    const title = conversation?.title ?? "conversación";
+    const body = messages
+      .map((m) => {
+        const who = m.role === "user" ? "## Vos" : `## ${conversation?.model ?? "Asistente"}`;
+        const sources =
+          m.sources && m.sources.length > 0
+            ? "\n\n### Fuentes\n" +
+              m.sources.map((s, i) => `${i + 1}. [${s.title}](${s.url})`).join("\n")
+            : "";
+        return `${who}\n\n${m.content}${sources}`;
+      })
+      .join("\n\n---\n\n");
+
+    const blob = new Blob([`# ${title}\n\n${body}\n`], {
+      type: "text/markdown;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${title.replace(/[^\w\sáéíóúñ-]/gi, "").trim() || "conversacion"}.md`;
+    link.click();
+    // Sin esto el blob queda retenido en memoria hasta recargar la página.
+    URL.revokeObjectURL(url);
   }
 
   const ready = models.length > 0;
   const hasMessages = messages.length > 0;
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
   const composer = (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleSend();
-      }}
-      className="mx-auto w-full max-w-2xl"
-    >
-      {pendingAttachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2">
-          {pendingAttachments.map((a) => (
-            <span
-              key={a.name}
-              className="flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--panel-2)] py-1 pl-1 pr-2 text-xs text-[var(--ink-dim)]"
-            >
-              {a.kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`data:${a.mimeType};base64,${a.content}`}
-                  alt=""
-                  className="h-5 w-5 rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--panel)] text-[var(--accent-bright)]">
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path
-                      d="M3 1.5h4l2 2v7H3v-9z"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                      strokeLinejoin="round"
-                    />
-                    <path d="M4.5 6h3M4.5 8h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-                  </svg>
-                </span>
-              )}
-              <span className="max-w-[10rem] truncate">{a.name}</span>
-              <button
-                type="button"
-                onClick={() => handleRemoveAttachment(a.name)}
-                aria-label={`Quitar ${a.name}`}
-                className="text-[var(--ink-dim)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none rounded-full"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-1.5 pl-2 shadow-sm transition-colors focus-within:border-[var(--accent)]/50 focus-within:ring-1 focus-within:ring-[var(--accent)]/20">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*,text/*,.md,.json,.csv,.log,.js,.ts,.tsx,.jsx,.py,.go,.rb,.java,.c,.cpp,.h,.css,.html,.yml,.yaml"
-          onChange={(e) => {
-            handleFilesSelected(e.target.files);
-            e.target.value = "";
-          }}
-          className="hidden"
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isStreaming || !ready || pendingAttachments.length >= MAX_ATTACHMENTS}
-          aria-label="Adjuntar archivo"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M11.5 5.5l-5 5a2 2 0 002.83 2.83l5-5a3.5 3.5 0 00-4.95-4.95l-5.3 5.3a5 5 0 007.07 7.07"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={ready ? "Escribe tu mensaje…" : "No hay modelos instalados en Ollama"}
-          disabled={isStreaming || !ready}
-          autoFocus
-          className="flex-1 rounded-full bg-transparent py-2.5 text-sm text-[var(--ink)] placeholder:text-[var(--ink-dim)] outline-none disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
-        />
-        <button
-          type="submit"
-          disabled={isStreaming || (!input.trim() && pendingAttachments.length === 0) || !ready}
-          aria-label="Enviar mensaje"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent)] text-[#ffffff] transition-colors enabled:hover:bg-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
-        >
-          {isStreaming ? (
-            <span className="think-dot h-2 w-2 rounded-full bg-[#ffffff]" />
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M1 7h11M7 2l5 5-5 5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      <div className="relative mx-auto mt-3 flex w-fit items-center">
-        <select
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
-          disabled={!!activeId}
-          className="appearance-none rounded-full border border-[var(--line)] bg-[var(--panel)] py-1.5 pl-4 pr-8 text-xs font-medium text-[var(--ink)] outline-none transition-colors hover:border-[var(--accent)]/40 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
-        >
-          {models.length === 0 && <option>Sin modelos instalados en Ollama</option>}
-          {models.map((m) => (
-            <option key={m} value={m} className="bg-[var(--panel)]">
-              {shortModel(m)}
-              {isCloudModel(m) ? " (cloud)" : ""}
-            </option>
-          ))}
-        </select>
-        <svg
-          className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--accent-bright)]"
-          viewBox="0 0 12 12"
-          fill="none"
-        >
-          <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-      </div>
-    </form>
+    <Composer
+      input={input}
+      onInputChange={setInput}
+      onSend={handleSend}
+      onStop={handleStop}
+      isStreaming={isStreaming}
+      disabled={!ready}
+      attachments={pendingAttachments}
+      onAttach={handleFilesSelected}
+      onRemoveAttachment={handleRemoveAttachment}
+      webSearch={webSearch}
+      onToggleWebSearch={() => setWebSearch((v) => !v)}
+      models={models}
+      selectedModel={selectedModel}
+      onSelectModel={handleSelectModel}
+      uploading={uploading}
+    />
   );
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-[var(--void)] font-[family-name:var(--font-body)] text-[var(--ink)]">
+      <a href="#contenido" className="skip-link">
+        Saltar al contenido
+      </a>
 
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-          className="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm md:hidden"
-        />
-      )}
+      {/* El fondo oscuro del drawer mobile lo pinta el propio Sidebar (ver
+          su prop `open`): duplicarlo acá oscurecía el doble y el de arriba
+          se comía los clics del de abajo. */}
+      <Sidebar
+        conversations={conversations}
+        activeId={activeId}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNew={handleNewConversation}
+        onSelect={handleSelectConversation}
+        onRequestDelete={handleRequestDelete}
+        onTogglePin={handleTogglePin}
+        onRename={handleRename}
+        onOpenSettings={handleOpenSettings}
+        onOpenShortcuts={openShortcuts}
+        search={search}
+        onSearchChange={setSearch}
+        searchInputRef={searchInputRef}
+        collapsed={sidebarCollapsed}
+        ollamaOnline={ollamaOnline}
+        ollamaUrl={ollamaUrl}
+        ollamaRemote={ollamaRemote}
+        currentUserEmail={currentUser?.email ?? null}
+        onLogout={handleLogout}
+      />
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-[var(--line)] bg-[var(--panel)]/95 backdrop-blur-xl transition-transform duration-300 ease-out md:relative md:z-10 md:flex md:translate-x-0 md:bg-[var(--panel)]/80 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center gap-2.5 px-5 pb-5 pt-6">
-          <span
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              ollamaOnline === null
-                ? "bg-[var(--accent-bright)]"
-                : ollamaOnline
-                ? "bg-emerald-500"
-                : "bg-red-500"
-            }`}
-            title={
-              ollamaOnline === null
-                ? "Comprobando Ollama…"
-                : ollamaOnline
-                ? "Ollama conectado"
-                : "Ollama desconectado"
-            }
-          />
-          <h1 className="font-[family-name:var(--font-display)] text-base font-semibold tracking-tight text-[var(--ink)]">
-            Chat-IA
-          </h1>
-          <span
-            className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-widest ${
-              ollamaOnline === false
-                ? "border-red-500/30 text-red-500"
-                : "border-[var(--line)] text-[var(--ink-dim)]"
-            }`}
-          >
-            {ollamaOnline === false ? "sin conexión" : "local"}
-          </span>
-          <button
-            type="button"
-            onClick={handleOpenSettings}
-            aria-label="Configuración"
-            title="Configuración"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M8 10a2 2 0 100-4 2 2 0 000 4z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <path
-                d="M13 8.6v-1.2l-1.4-.35a4.4 4.4 0 00-.5-1.2l.75-1.25-.85-.85-1.25.75a4.4 4.4 0 00-1.2-.5L8.2 3H7l-.35 1.4c-.43.11-.83.28-1.2.5L4.2 4.15l-.85.85.75 1.25c-.22.37-.39.77-.5 1.2L2.2 7.8V9l1.4.35c.11.43.28.83.5 1.2l-.75 1.25.85.85 1.25-.75c.37.22.77.39 1.2.5L7 13.8h1.2l.35-1.4c.43-.11.83-.28 1.2-.5l1.25.75.85-.85-.75-1.25c.22-.37.39-.77.5-1.2L13 8.6z"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-        {ollamaUrl && (
-          <p className="-mt-3 px-5 pb-4 font-mono text-[10px] text-[var(--ink-dim)]" title={`Ollama en ${ollamaUrl}`}>
-            {ollamaUrl}
-          </p>
-        )}
-
-        <div className="px-4">
-          <button
-            onClick={handleNewConversation}
-            className="group relative w-full rounded-md border border-[var(--line)] bg-[var(--panel-2)] px-4 py-2.5 text-left text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--accent)]/40 hover:bg-[var(--accent)]/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
-          >
-            <span className="relative z-10 flex items-center gap-2">
-              <span className="text-base leading-none text-[var(--accent-bright)]">+</span>
-              Nueva conversación
-            </span>
-          </button>
-        </div>
-
-        <div className="mt-6 flex-1 overflow-y-auto px-3 pb-4">
-          <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
-            Historial
-          </p>
-          <div className="flex flex-col gap-1">
-            {conversations.length === 0 && (
-              <p className="px-2 py-3 text-xs text-[var(--ink-dim)]">
-                Todavía no hay conversaciones.
-              </p>
-            )}
-            {conversations.map((c) => {
-              const active = c.id === activeId;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => handleSelectConversation(c.id)}
-                  className={`group relative rounded-lg py-2.5 pl-3 pr-9 text-left transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)] ${
-                    active
-                      ? "bg-[var(--panel-2)] text-[var(--ink)]"
-                      : "text-[var(--ink-dim)] hover:bg-[var(--panel-2)]/60 hover:text-[var(--ink)]"
-                  }`}
-                >
-                  {active && (
-                    <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-[var(--accent-bright)]" />
-                  )}
-                  <span className="block truncate text-sm">{c.title}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-[var(--ink-dim)]">
-                    {shortModel(c.model)}
-                  </span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => handleRequestDelete(e, c.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleRequestDelete(e, c.id);
-                      }
-                    }}
-                    aria-label={`Borrar "${c.title}"`}
-                    className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[var(--ink-dim)] opacity-0 transition-opacity hover:bg-red-500/15 hover:text-red-500 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none group-hover:opacity-100"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path
-                        d="M2 3h8M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M4 5.5v3M6 5.5v3M8 5.5v3M2.75 3l.5 7a1 1 0 001 .9h3.5a1 1 0 001-.9l.5-7"
-                        stroke="currentColor"
-                        strokeWidth="1.1"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="relative z-10 flex flex-1 flex-col">
+      {/* tabIndex -1 para que el enlace "saltar al contenido" tenga dónde
+          aterrizar: un <main> sin él recibe el hash pero no el foco, y el
+          Tab siguiente arrancaría otra vez desde el principio de la página. */}
+      <main id="contenido" tabIndex={-1} className="relative z-10 flex flex-1 flex-col outline-none">
         <header className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-4 md:px-8">
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label="Mostrar historial de conversaciones"
+              title="Mostrar historial de conversaciones"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink)] transition-colors hover:border-[var(--accent)]/40 md:flex focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Abrir historial de conversaciones"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink)] transition-colors hover:border-[var(--accent)]/40 md:hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M2 4h12M2 8h12M2 12h12"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
+              <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
-          <div>
-            <p className="font-[family-name:var(--font-display)] text-base font-semibold text-[var(--ink)]">
-              Conversación privada
+          <div className="min-w-0">
+            <p className="truncate font-[family-name:var(--font-display)] text-base font-semibold text-[var(--ink)]">
+              {conversations.find((c) => c.id === activeId)?.title ?? "Nueva conversación"}
             </p>
             <p className="text-xs text-[var(--ink-dim)]">
-              {selectedModel && isCloudModel(selectedModel)
-                ? "Este modelo corre en la nube de Ollama: tus mensajes sí salen de tu máquina."
-                : "Servida desde tu Ollama en localhost — nada sale de tu máquina."}
+              {/* Un Ollama remoto ya saca los mensajes de la máquina aunque
+                  el modelo no sea "-cloud": no se puede prometer privacidad
+                  local solo porque el nombre del modelo no diga cloud. */}
+              {ollamaRemote
+                ? "Ollama remoto: tus mensajes salen de tu máquina."
+                : selectedModel && isCloudModel(selectedModel)
+                ? "Modelo en la nube: tus mensajes salen de tu máquina."
+                : "Servido por tu Ollama local."}
+              {webSearch ? " Búsqueda web activada." : ""}
             </p>
           </div>
+          {hasMessages && (
+            <button
+              type="button"
+              onClick={handleExport}
+              aria-label="Exportar conversación a Markdown"
+              title="Exportar a Markdown"
+              className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 2v8m0 0L5 7m3 3l3-3M3 12v1.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V12"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
         </header>
 
         {!hasMessages && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-8 px-8 pb-32">
+          <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto px-8 py-8">
             <div className="flex flex-col items-center gap-3 text-center">
               <p className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--ink)]">
-                ¿En qué piensas?
+                ¿En qué estás pensando?
               </p>
               <p className="max-w-sm text-sm text-[var(--ink-dim)]">
-                Empieza una conversación con{" "}
-                <span className="text-[var(--accent-bright)]">
-                  {selectedModel ? shortModel(selectedModel) : "tu modelo"}
-                </span>
-                .{" "}
-                {selectedModel && isCloudModel(selectedModel)
-                  ? "Es un modelo cloud de Ollama: tus mensajes viajan a sus servidores."
-                  : "Corre en tu Ollama local, nada sale de tu máquina."}
+                Escribí lo que quieras, adjuntá un PDF o activá la búsqueda web para
+                que la respuesta venga con fuentes.
               </p>
             </div>
+
+            <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setInput(suggestion)}
+                  disabled={!ready}
+                  className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 text-left text-[13px] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+
             {composer}
+            {error && (
+              <div className="w-full max-w-2xl rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-700">
+                <span className="mr-1 text-red-500">⚠</span>
+                {error}
+              </div>
+            )}
           </div>
         )}
 
         {hasMessages && (
-        <>
-        <div className="flex-1 overflow-y-auto px-8 py-8">
-          <div className="mx-auto flex max-w-2xl flex-col gap-5">
-            {messages.map((m) => (
+          <>
+            <div className="flex-1 overflow-y-auto px-4 py-8 md:px-8">
+              {/* role="log" + aria-live="polite": el lector de pantalla lee lo
+                  que se va agregando cuando termina lo que estaba diciendo, en
+                  vez de interrumpir a cada token como haría "assertive". */}
               <div
-                key={m.id}
-                className={`msg-enter flex items-end gap-3 ${
-                  m.role === "user" ? "flex-row-reverse self-end" : "self-start"
-                }`}
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions text"
+                aria-label="Mensajes de la conversación"
+                className="mx-auto flex max-w-2xl flex-col gap-5"
               >
-                {m.role === "assistant" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--line)] bg-[var(--panel-2)] font-[family-name:var(--font-display)] text-xs font-semibold text-[var(--accent)]">
-                    A
-                  </div>
-                )}
-                <div
-                  className={`max-w-[75%] whitespace-pre-wrap rounded-lg px-4 py-3 text-[13.5px] leading-relaxed ${
-                    m.role === "user"
-                      ? "rounded-br-sm bg-[var(--accent)] text-[#ffffff]"
-                      : "rounded-bl-sm border border-[var(--line)] bg-[var(--panel)] text-[var(--ink)]"
-                  }`}
-                >
-                  {m.attachments && m.attachments.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {m.attachments.map((a) =>
-                        a.kind === "image" ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            key={a.name}
-                            src={`data:${a.mimeType};base64,${a.content}`}
-                            alt={a.name}
-                            className="h-16 w-16 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <span
-                            key={a.name}
-                            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${
-                              m.role === "user"
-                                ? "bg-black/10 text-[#ffffff]"
-                                : "bg-[var(--panel-2)] text-[var(--ink-dim)]"
-                            }`}
-                          >
-                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                              <path
-                                d="M3 1.5h4l2 2v7H3v-9z"
-                                stroke="currentColor"
-                                strokeWidth="1"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                            {a.name}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  )}
-                  {m.content ? (
-                    m.content
-                  ) : isStreaming && m.role === "assistant" ? (
-                    <span className="flex items-center gap-1.5 py-0.5">
-                      <span className="think-dot h-1.5 w-1.5 rounded-full bg-[var(--accent-bright)]" />
-                      <span
-                        className="think-dot h-1.5 w-1.5 rounded-full bg-[var(--accent-bright)]"
-                        style={{ animationDelay: "0.15s" }}
-                      />
-                      <span
-                        className="think-dot h-1.5 w-1.5 rounded-full bg-[var(--accent-bright)]"
-                        style={{ animationDelay: "0.3s" }}
-                      />
-                    </span>
-                  ) : (
-                    ""
-                  )}
+                {messages.map((message) => (
+                  <ChatMessage
+                    key={message.id}
+                    message={message}
+                    isStreaming={isStreaming && message.id === lastAssistantId}
+                    canAct={!isStreaming}
+                    onRegenerate={() => handleRegenerate(message.id)}
+                    onEdit={(newText) => handleEdit(message.id, newText)}
+                  />
+                ))}
+                <div ref={bottomRef} />
+              </div>
+            </div>
+
+            {status && (
+              <div className="mx-4 mb-2 md:mx-8">
+                <p className="mx-auto max-w-2xl text-xs text-[var(--ink-dim)]">
+                  <span className="shimmer-text">{status}</span>
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="mx-4 mb-3 md:mx-8">
+                <div className="mx-auto flex max-w-2xl items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-700">
+                  <span className="mt-0.5 text-red-500">⚠</span>
+                  {error}
                 </div>
               </div>
-            ))}
-            <div ref={bottomRef} />
-          </div>
-        </div>
+            )}
 
-        {error && (
-          <div className="mx-8 mb-3">
-            <div className="mx-auto flex max-w-2xl items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-700">
-              <span className="mt-0.5 text-red-500">⚠</span>
-              {error}
-            </div>
-          </div>
-        )}
-
-        <div className="px-8 pb-8 pt-2">{composer}</div>
-        </>
-        )}
-
-        {!hasMessages && error && (
-          <div className="absolute bottom-28 left-0 right-0 px-8">
-            <div className="mx-auto flex max-w-2xl items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-700">
-              <span className="mt-0.5 text-red-500">⚠</span>
-              {error}
-            </div>
-          </div>
+            <div className="px-4 pb-8 pt-2 md:px-8">{composer}</div>
+          </>
         )}
       </main>
 
       {confirmDeleteId && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           onClick={closeDeleteModal}
         >
           <div
@@ -863,139 +1032,38 @@ export default function Home() {
         </div>
       )}
 
-      {settingsOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={closeSettingsModal}
-        >
-          <div
-            ref={settingsModalRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="settings-title"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => handleModalTabTrap(e, settingsModalRef)}
-            className="msg-enter flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
-          >
-            <div className="flex items-center justify-between">
-              <p
-                id="settings-title"
-                className="font-[family-name:var(--font-display)] text-base font-semibold text-[var(--ink)]"
-              >
-                Configuración
-              </p>
-              <button
-                type="button"
-                onClick={closeSettingsModal}
-                aria-label="Cerrar"
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-dim)] hover:bg-[var(--panel-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-              >
-                ×
-              </button>
-            </div>
+      <SettingsModal
+        open={settingsOpen}
+        onClose={closeSettingsModal}
+        systemPrompt={systemPrompt}
+        systemPromptDraft={systemPromptDraft}
+        onSystemPromptDraftChange={setSystemPromptDraft}
+        onSaveSystemPrompt={handleSaveSystemPrompt}
+        memories={memories}
+        newMemoryText={newMemoryText}
+        onNewMemoryTextChange={setNewMemoryText}
+        onAddMemory={handleAddMemory}
+        onDeleteMemory={handleDeleteMemory}
+        loading={settingsLoading}
+        saving={settingsSaving}
+        error={settingsError}
+        isOwner={currentUser?.role === "OWNER"}
+        users={users}
+        usersLoading={usersLoading}
+        newInviteEmail={newInviteEmail}
+        onNewInviteEmailChange={setNewInviteEmail}
+        onInvite={handleInvite}
+        inviting={inviting}
+        inviteError={inviteError}
+        inviteSuccessMessage={inviteSuccessMessage}
+      />
 
-            {settingsLoading ? (
-              <p className="py-8 text-center text-sm text-[var(--ink-dim)]">Cargando…</p>
-            ) : (
-              <div className="mt-4 flex-1 overflow-y-auto pr-1">
-                <section>
-                  <label
-                    htmlFor="system-prompt"
-                    className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-dim)]"
-                  >
-                    Prompt del sistema (SYSTEM_PROMPT.md)
-                  </label>
-                  <p className="mt-1 text-xs text-[var(--ink-dim)]">
-                    Instrucciones que el modelo recibe en cada mensaje de cada conversación.
-                  </p>
-                  <textarea
-                    id="system-prompt"
-                    value={systemPromptDraft}
-                    onChange={(e) => setSystemPromptDraft(e.target.value)}
-                    rows={6}
-                    className="mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-[var(--void)] p-3 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
-                  />
-                  <div className="mt-2 flex items-center justify-end gap-2">
-                    {systemPromptDraft !== systemPrompt && (
-                      <span className="text-xs text-[var(--ink-dim)]">Sin guardar</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleSaveSystemPrompt}
-                      disabled={settingsSaving || systemPromptDraft === systemPrompt}
-                      className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-                    >
-                      {settingsSaving ? "Guardando…" : "Guardar"}
-                    </button>
-                  </div>
-                </section>
-
-                <section className="mt-6 border-t border-[var(--line)] pt-4">
-                  <label
-                    htmlFor="new-memory"
-                    className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-dim)]"
-                  >
-                    Memoria
-                  </label>
-                  <p className="mt-1 text-xs text-[var(--ink-dim)]">
-                    Notas que el asistente recuerda en todas las conversaciones, no solo en esta.
-                  </p>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddMemory();
-                    }}
-                    className="mt-2 flex gap-2"
-                  >
-                    <input
-                      id="new-memory"
-                      value={newMemoryText}
-                      onChange={(e) => setNewMemoryText(e.target.value)}
-                      placeholder="Ej: prefiero respuestas cortas y en español"
-                      className="flex-1 rounded-full border border-[var(--line)] bg-[var(--void)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!newMemoryText.trim()}
-                      className="rounded-full border border-[var(--line)] px-4 py-2 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--panel-2)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-                    >
-                      Agregar
-                    </button>
-                  </form>
-
-                  <ul className="mt-3 flex flex-col gap-1.5">
-                    {memories.length === 0 && (
-                      <li className="text-xs text-[var(--ink-dim)]">Todavía no hay notas guardadas.</li>
-                    )}
-                    {memories.map((m) => (
-                      <li
-                        key={m.id}
-                        className="flex items-center justify-between gap-2 rounded-lg bg-[var(--panel-2)] px-3 py-2 text-sm text-[var(--ink)]"
-                      >
-                        <span className="break-words">{m.content}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMemory(m.id)}
-                          aria-label={`Borrar nota "${m.content}"`}
-                          className="shrink-0 text-[var(--ink-dim)] hover:text-red-500 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none rounded-full"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-
-                {settingsError && (
-                  <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
-                    {settingsError}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <ShortcutsModal
+        open={shortcutsOpen}
+        onClose={closeShortcuts}
+        isMac={isMac}
+        onTabTrap={handleModalTabTrap}
+      />
     </div>
   );
 }

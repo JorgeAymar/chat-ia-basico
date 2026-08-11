@@ -1,3 +1,3 @@
-Este es un documento de prueba para los tests E2E de Ámbar.
-El código secreto de esta prueba es AMBAR-7X92.
-No compartas este código fuera del contexto de este test.
+Documento de prueba para los tests E2E de Orion Chat.
+El identificador de esta prueba es AMBAR-7X92.
+Este archivo existe solo para verificar que el contenido de un adjunto llega al modelo.

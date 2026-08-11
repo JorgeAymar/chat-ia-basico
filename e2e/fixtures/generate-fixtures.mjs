@@ -10,11 +10,15 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- test-doc.txt: contiene un dato verificable único ---
-const secretDoc = `Este es un documento de prueba para los tests E2E de Ámbar.
-El código secreto de esta prueba es AMBAR-7X92.
-No compartas este código fuera del contexto de este test.
+// El texto es deliberadamente neutro: una versión anterior decía "código
+// secreto" y "no compartas este código", y los modelos cloud interpretaban
+// eso como una instrucción y se negaban a transcribirlo, haciendo fallar el
+// test aunque el adjunto se hubiera leído bien.
+const markerDoc = `Documento de prueba para los tests E2E de Orion Chat.
+El identificador de esta prueba es AMBAR-7X92.
+Este archivo existe solo para verificar que el contenido de un adjunto llega al modelo.
 `;
-writeFileSync(path.join(__dirname, "test-doc.txt"), secretDoc, "utf-8");
+writeFileSync(path.join(__dirname, "test-doc.txt"), markerDoc, "utf-8");
 
 // --- test-image.png: PNG 1x1 válido (rojo sólido), generado a mano ---
 // PNG mínimo: firma + IHDR + IDAT + IEND, con CRCs correctos.

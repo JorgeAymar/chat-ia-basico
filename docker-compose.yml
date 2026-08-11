@@ -7,9 +7,32 @@ services:
       POSTGRES_PASSWORD: chatpass
       POSTGRES_DB: chat_ia_basico
     ports:
-      - "5435:5432"
+      # 5436 en el host: el 5432/5433/5435 suelen estar tomados por otros
+      # proyectos con Postgres propio.
+      - "5436:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  # Metabuscador para la búsqueda web del chat. Consulta DuckDuckGo/Brave/
+  # Mojeek por vos: no hace falta API key ni cuenta, y lo único que sale de
+  # la máquina es la consulta.
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      # Atado a 127.0.0.1 a propósito: una instancia de SearXNG expuesta a la
+      # red la usan de proxy de scraping ajeno en cuestión de horas.
+      - "127.0.0.1:8080:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=orion-chat-local-dev-secret
+      - SEARXNG_LIMITER=false
+      - SEARXNG_PUBLIC_INSTANCE=false
+    volumes:
+      # settings.yml está versionado en el repo, ver el comentario de adentro.
+      - ./searxng:/etc/searxng:rw
+      - searxng-cache:/var/cache/searxng
+
 volumes:
   postgres-data:
+  searxng-cache:
