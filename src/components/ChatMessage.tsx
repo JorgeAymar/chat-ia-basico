@@ -104,10 +104,10 @@ export function ChatMessage({
 
       <div className={`flex max-w-[75%] min-w-0 flex-col ${isUser ? "items-end" : "items-start"}`}>
         <div
-          className={`w-full rounded-lg px-4 py-3 text-[13.5px] leading-relaxed ${
+          className={`w-full rounded-2xl px-5 py-3.5 text-[13.5px] leading-relaxed ${
             isUser
-              ? "rounded-br-sm bg-[var(--accent)] text-[#ffffff]"
-              : "rounded-bl-sm border border-[var(--line)] bg-[var(--panel)] text-[var(--ink)]"
+              ? "rounded-tr-sm bg-[var(--accent)] text-[#ffffff]"
+              : "rounded-tl-sm border border-[var(--line)] bg-[var(--panel)] text-[var(--ink)] shadow-sm"
           }`}
         >
           {attachments.length > 0 && <Attachments attachments={attachments} isUser={isUser} />}

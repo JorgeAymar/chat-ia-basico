@@ -230,33 +230,38 @@ export function Sidebar({
         }`}
       >
         <div className="flex items-center gap-2.5 px-5 pb-5 pt-6">
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent)] font-[family-name:var(--font-display)] text-xs font-bold text-white">
+            {APP_NAME.slice(0, 2).toUpperCase()}
+            <span
+              className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--panel)] ${
+                ollamaOnline === null
+                  ? "bg-[var(--accent-bright)]"
+                  : ollamaOnline
+                  ? "bg-emerald-500"
+                  : "bg-red-500"
+              }`}
+              title={
+                ollamaOnline === null
+                  ? "Comprobando Ollama…"
+                  : ollamaOnline
+                  ? "Ollama conectado"
+                  : "Ollama desconectado"
+              }
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-[family-name:var(--font-display)] text-base font-semibold leading-tight tracking-tight text-[var(--ink)]">
+              {APP_NAME}
+            </h1>
+            <span
+              className="font-[family-name:var(--font-label)] text-[10px] font-medium uppercase tracking-wider text-[var(--ink-dim)]"
+              title={`${APP_NAME} versión ${APP_VERSION}`}
+            >
+              v{APP_VERSION}
+            </span>
+          </div>
           <span
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              ollamaOnline === null
-                ? "bg-[var(--accent-bright)]"
-                : ollamaOnline
-                ? "bg-emerald-500"
-                : "bg-red-500"
-            }`}
-            title={
-              ollamaOnline === null
-                ? "Comprobando Ollama…"
-                : ollamaOnline
-                ? "Ollama conectado"
-                : "Ollama desconectado"
-            }
-          />
-          <h1 className="font-[family-name:var(--font-display)] text-base font-semibold tracking-tight text-[var(--ink)]">
-            {APP_NAME}
-          </h1>
-          <span
-            className="text-[10px] font-medium text-[var(--ink-dim)]"
-            title={`${APP_NAME} versión ${APP_VERSION}`}
-          >
-            v{APP_VERSION}
-          </span>
-          <span
-            className={`ml-auto rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-widest ${
+            className={`shrink-0 rounded-full border px-2 py-0.5 font-[family-name:var(--font-label)] text-[10px] uppercase tracking-widest ${
               ollamaOnline === false
                 ? "border-red-500/30 text-red-500"
                 : "border-[var(--line)] text-[var(--ink-dim)]"
@@ -344,7 +349,7 @@ export function Sidebar({
 
           {pinned.length > 0 && (
             <>
-              <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
+              <p className="px-2 pb-2 font-[family-name:var(--font-label)] text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
                 Fijadas
               </p>
               <div className="flex flex-col gap-1">{pinned.map(renderItem)}</div>
@@ -354,7 +359,7 @@ export function Sidebar({
           {rest.length > 0 && (
             <>
               <p
-                className={`px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70 ${
+                className={`px-2 pb-2 font-[family-name:var(--font-label)] text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70 ${
                   pinned.length > 0 ? "mt-5" : ""
                 }`}
               >

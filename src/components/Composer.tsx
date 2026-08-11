@@ -130,7 +130,7 @@ export function Composer({
         </div>
       )}
 
-      <div className="flex items-end gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-1.5 pl-2 shadow-sm transition-colors focus-within:border-[var(--accent)]/50 focus-within:ring-1 focus-within:ring-[var(--accent)]/20">
+      <div className="flex items-end gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-1.5 pl-2 shadow-sm transition-colors focus-within:border-[var(--accent)]/50 focus-within:ring-1 focus-within:ring-[var(--accent)]/20">
         <input
           ref={fileInputRef}
           type="file"

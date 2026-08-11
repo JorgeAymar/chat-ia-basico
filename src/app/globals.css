@@ -24,6 +24,7 @@
   --color-accent: var(--accent);
   --font-display: var(--font-display);
   --font-body: var(--font-body);
+  --font-label: var(--font-label);
 }
 
 * {

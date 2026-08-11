@@ -27,7 +27,7 @@ export function Sources({ sources }: { sources: Source[] }) {
 
   return (
     <div className="mt-3 border-t border-[var(--line)] pt-2.5">
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
+      <p className="mb-1.5 font-[family-name:var(--font-label)] text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
         Fuentes ({sources.length})
       </p>
       <ol className="flex flex-col gap-1">
