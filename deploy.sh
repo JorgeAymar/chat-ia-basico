@@ -70,14 +70,25 @@ OLD_NAME="orion-app-${CURRENT_PORT}"
 
 echo "==> Activo hoy: puerto ${CURRENT_PORT:-ninguno (primer deploy)}. Nuevo: $NEW_PORT ($NEW_NAME)"
 
-# --env-file le pasa al contenedor TODO lo que hay en .env.production tal
-# cual (incluida la DATABASE_URL, que ahí adentro ya usa el hostname interno
-# `postgres`, no localhost): no hace falta reconstruir nada acá.
+# NO usamos `docker run --env-file "$ENV_FILE"` acá: a diferencia de
+# `docker compose --env-file` (que sí lo hace), el `docker run` de la CLI de
+# Docker NO saca las comillas de un archivo con líneas `VAR="valor"` — las
+# deja como parte literal del valor. Como $ENV_FILE tiene que poder
+# `source`-arse más arriba (para ORION_BLUE_PORT etc., algunos valores como
+# SMTP_FROM necesitan comillas por los espacios/`<>`), en vez de eso le
+# pasamos cada variable con `-e NOMBRE` (sin `=valor`): así Docker toma el
+# valor ya correcto que `source` dejó en el entorno de este script.
+ENV_FLAGS=()
+while IFS='=' read -r key _; do
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+  ENV_FLAGS+=(-e "$key")
+done < <(grep -vE '^\s*(#|$)' "$ENV_FILE")
+
 docker rm -f "$NEW_NAME" >/dev/null 2>&1 || true
 docker run -d --name "$NEW_NAME" \
   --network "$NETWORK" \
   -p "127.0.0.1:${NEW_PORT}:3000" \
-  --env-file "$ENV_FILE" \
+  "${ENV_FLAGS[@]}" \
   --restart unless-stopped \
   orion-app:latest
 
