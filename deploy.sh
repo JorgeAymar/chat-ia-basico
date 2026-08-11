@@ -5,11 +5,16 @@
 #
 # Cómo logra el "sin caída": nunca para el contenedor viejo antes de tener
 # el nuevo respondiendo. Arranca el nuevo en el puerto que esté libre
-# (3001 o 3002, el que no sea el activo), espera a que conteste 200, recién
-# ahí reescribe a qué puerto apunta nginx y le pide un reload — que es
-# gracioso: los requests en vuelo en los workers viejos de nginx terminan
-# normal, los nuevos ya entran por el puerto nuevo. El contenedor viejo se
-# apaga último, cuando ya nadie le está mandando tráfico nuevo.
+# (BLUE_PORT o GREEN_PORT, el que no sea el activo), espera a que conteste
+# 200, recién ahí reescribe a qué puerto apunta nginx y le pide un reload —
+# que es gracioso: los requests en vuelo en los workers viejos de nginx
+# terminan normal, los nuevos ya entran por el puerto nuevo. El contenedor
+# viejo se apaga último, cuando ya nadie le está mandando tráfico nuevo.
+#
+# Los puertos NO están fijos en el código: este VPS es compartido con
+# muchos otros sitios, así que cuáles están libres varía por servidor.
+# Configurálos en el entorno (ver .env.production.example) antes de correr
+# esto la primera vez en una máquina nueva.
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,16 +23,29 @@ cd "$PROJECT_DIR"
 ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_PROJECT="orion"
 NETWORK="${COMPOSE_PROJECT}_default"
-STATE_FILE="/etc/orion/active_port"
-NGINX_UPSTREAM_FILE="/etc/nginx/orion-active-upstream.conf"
-HEALTH_PATH="/api/models"
-HEALTH_RETRIES=30
-HEALTH_DELAY=2
+STATE_FILE="${ORION_STATE_FILE:-/etc/orion/active_port}"
+NGINX_UPSTREAM_FILE="${ORION_NGINX_UPSTREAM_FILE:-/etc/nginx/orion-active-upstream.conf}"
+HEALTH_PATH="${ORION_HEALTH_PATH:-/api/models}"
+HEALTH_RETRIES="${ORION_HEALTH_RETRIES:-30}"
+HEALTH_DELAY="${ORION_HEALTH_DELAY:-2}"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Falta $ENV_FILE — copiá .env.production.example y completá los valores reales." >&2
   exit 1
 fi
+
+# Trae ORION_BLUE_PORT/ORION_GREEN_PORT (y cualquier otra var de $ENV_FILE)
+# a este shell — hasta acá solo se los pasábamos al contenedor con
+# --env-file, no estaban disponibles para la lógica del script.
+set -o allexport
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +o allexport
+
+: "${ORION_BLUE_PORT:?falta ORION_BLUE_PORT en $ENV_FILE (ver .env.production.example)}"
+: "${ORION_GREEN_PORT:?falta ORION_GREEN_PORT en $ENV_FILE (ver .env.production.example)}"
+BLUE_PORT="$ORION_BLUE_PORT"
+GREEN_PORT="$ORION_GREEN_PORT"
 
 echo "==> Levantando postgres/searxng (si no estaban) y aplicando migraciones…"
 docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" up -d postgres searxng
@@ -39,13 +57,13 @@ docker build -t orion-app:latest --target runner .
 
 mkdir -p "$(dirname "$STATE_FILE")"
 CURRENT_PORT="$(cat "$STATE_FILE" 2>/dev/null || echo "")"
-if [ "$CURRENT_PORT" = "3011" ]; then
-  NEW_PORT=3012
-elif [ "$CURRENT_PORT" = "3012" ]; then
-  NEW_PORT=3011
+if [ "$CURRENT_PORT" = "$BLUE_PORT" ]; then
+  NEW_PORT="$GREEN_PORT"
+elif [ "$CURRENT_PORT" = "$GREEN_PORT" ]; then
+  NEW_PORT="$BLUE_PORT"
 else
   # Primer despliegue: no hay contenedor previo corriendo.
-  NEW_PORT=3011
+  NEW_PORT="$BLUE_PORT"
 fi
 NEW_NAME="orion-app-${NEW_PORT}"
 OLD_NAME="orion-app-${CURRENT_PORT}"
