@@ -36,6 +36,8 @@ type SettingsModalProps = {
   inviting: boolean;
   inviteError: string | null;
   inviteSuccessMessage: string | null;
+  resendingUserId: string | null;
+  onResendInvite: (id: string, email: string) => void;
 };
 
 export function SettingsModal({
@@ -62,6 +64,8 @@ export function SettingsModal({
   inviting,
   inviteError,
   inviteSuccessMessage,
+  resendingUserId,
+  onResendInvite,
 }: SettingsModalProps): React.JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -302,9 +306,21 @@ export function SettingsModal({
                               Activo
                             </span>
                           ) : (
-                            <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[10px] uppercase tracking-widest text-[var(--ink-dim)]">
-                              Invitado
-                            </span>
+                            <>
+                              <span className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[10px] uppercase tracking-widest text-[var(--ink-dim)]">
+                                Invitado
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onResendInvite(u.id, u.email)}
+                                disabled={resendingUserId === u.id}
+                                aria-label={`Reenviar invitación a ${u.email}`}
+                                title="Reenviar invitación"
+                                className="rounded-full px-2 py-0.5 text-[10px] font-medium text-[var(--accent-bright)] transition-colors hover:bg-[var(--panel)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+                              >
+                                {resendingUserId === u.id ? "Enviando…" : "Reenviar"}
+                              </button>
+                            </>
                           )}
                         </span>
                       </li>

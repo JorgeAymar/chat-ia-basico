@@ -10,6 +10,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ShortcutsModal } from "@/components/ShortcutsModal";
 import { hasShortcutModifier, isTypingTarget } from "@/lib/shortcuts";
+import { exportConversation, EXPORT_FORMAT_LABELS, type ExportFormat } from "@/lib/export";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_TEXT_BYTES = 300 * 1024;
@@ -120,6 +121,12 @@ export default function Home() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccessMessage, setInviteSuccessMessage] = useState<string | null>(null);
+  // Id del usuario cuya invitación se está reenviando ahora mismo (null si
+  // ninguna): a diferencia de `inviting`, que es para el form de invitar
+  // gente nueva, esto es por fila de la lista.
+  const [resendingUserId, setResendingUserId] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const deleteModalRef = useRef<HTMLDivElement>(null);
@@ -178,6 +185,22 @@ export default function Home() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (!exportMenuRef.current?.contains(e.target as Node)) setExportMenuOpen(false);
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setExportMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [exportMenuOpen]);
 
   // La plataforma no se puede leer durante el render: el servidor no tiene
   // `navigator` y pintaría "Ctrl" donde el cliente pinta "⌘", lo que rompe la
@@ -448,10 +471,10 @@ export default function Home() {
     }
   }
 
-  async function handleInvite() {
-    const email = newInviteEmail.trim();
-    if (!email) return;
-    setInviting(true);
+  // Compartida entre invitar gente nueva y reenviar: el backend ya trata
+  // ambos casos igual (POST con un email que ya existe pero no está ACTIVE
+  // simplemente genera un token nuevo y reenvía el correo).
+  async function inviteEmail(email: string): Promise<boolean> {
     setInviteError(null);
     setInviteSuccessMessage(null);
     try {
@@ -464,12 +487,25 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error ?? "No se pudo enviar la invitación");
       setUsers((prev) => [data.user, ...prev.filter((u) => u.id !== data.user.id)]);
       setInviteSuccessMessage(`Invitación enviada a ${data.user.email}`);
-      setNewInviteEmail("");
+      return true;
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "No se pudo enviar la invitación");
-    } finally {
-      setInviting(false);
+      return false;
     }
+  }
+
+  async function handleInvite() {
+    const email = newInviteEmail.trim();
+    if (!email) return;
+    setInviting(true);
+    if (await inviteEmail(email)) setNewInviteEmail("");
+    setInviting(false);
+  }
+
+  async function handleResendInvite(id: string, email: string) {
+    setResendingUserId(id);
+    await inviteEmail(email);
+    setResendingUserId(null);
   }
 
   async function handleLogout() {
@@ -755,31 +791,10 @@ export default function Home() {
     );
   }
 
-  function handleExport() {
+  function handleExport(format: ExportFormat) {
     const conversation = conversations.find((c) => c.id === activeId);
-    const title = conversation?.title ?? "conversación";
-    const body = messages
-      .map((m) => {
-        const who = m.role === "user" ? "## Vos" : `## ${conversation?.model ?? "Asistente"}`;
-        const sources =
-          m.sources && m.sources.length > 0
-            ? "\n\n### Fuentes\n" +
-              m.sources.map((s, i) => `${i + 1}. [${s.title}](${s.url})`).join("\n")
-            : "";
-        return `${who}\n\n${m.content}${sources}`;
-      })
-      .join("\n\n---\n\n");
-
-    const blob = new Blob([`# ${title}\n\n${body}\n`], {
-      type: "text/markdown;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${title.replace(/[^\w\sáéíóúñ-]/gi, "").trim() || "conversacion"}.md`;
-    link.click();
-    // Sin esto el blob queda retenido en memoria hasta recargar la página.
-    URL.revokeObjectURL(url);
+    exportConversation(format, conversation, messages);
+    setExportMenuOpen(false);
   }
 
   const ready = models.length > 0;
@@ -882,23 +897,47 @@ export default function Home() {
             </p>
           </div>
           {hasMessages && (
-            <button
-              type="button"
-              onClick={handleExport}
-              aria-label="Exportar conversación a Markdown"
-              title="Exportar a Markdown"
-              className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-            >
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M8 2v8m0 0L5 7m3 3l3-3M3 12v1.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V12"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
+            <div className="relative ml-auto" ref={exportMenuRef}>
+              <button
+                type="button"
+                onClick={() => setExportMenuOpen((v) => !v)}
+                aria-label="Exportar conversación"
+                aria-haspopup="menu"
+                aria-expanded={exportMenuOpen}
+                title="Exportar conversación"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M8 2v8m0 0L5 7m3 3l3-3M3 12v1.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V12"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              {exportMenuOpen && (
+                <div
+                  role="menu"
+                  className="msg-enter absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--panel)] py-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.25)]"
+                >
+                  {(Object.entries(EXPORT_FORMAT_LABELS) as [ExportFormat, string][]).map(
+                    ([format, label]) => (
+                      <button
+                        key={format}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => handleExport(format)}
+                        className="block w-full px-3 py-2 text-left text-sm text-[var(--ink)] transition-colors hover:bg-[var(--panel-2)] focus-visible:bg-[var(--panel-2)] focus-visible:outline-none"
+                      >
+                        {label}
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </header>
 
@@ -1056,6 +1095,8 @@ export default function Home() {
         inviting={inviting}
         inviteError={inviteError}
         inviteSuccessMessage={inviteSuccessMessage}
+        resendingUserId={resendingUserId}
+        onResendInvite={handleResendInvite}
       />
 
       <ShortcutsModal

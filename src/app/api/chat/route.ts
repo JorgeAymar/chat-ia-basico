@@ -25,7 +25,19 @@ async function buildSystemMessage(userId: string, extra?: string): Promise<Ollam
           .join("\n")}`
       : "";
 
-  const content = `${prompt}${memoryBlock}${extra ? `\n\n${extra}` : ""}`.trim();
+  // Sin esto el modelo no tiene forma de saber la fecha/hora real: solo
+  // conoce lo que vio en su entrenamiento, así que "¿qué hora es?" lo
+  // contestaría inventando. Se manda en UTC (no la hora de un usuario en
+  // particular, que la app no conoce) y el propio modelo puede convertirla
+  // si el usuario le da su zona horaria.
+  const now = new Date();
+  const dateTimeBlock = `\n\nFecha y hora actual (UTC): ${now.toLocaleString("es-MX", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: "UTC",
+  })}.`;
+
+  const content = `${prompt}${dateTimeBlock}${memoryBlock}${extra ? `\n\n${extra}` : ""}`.trim();
   return content ? { role: "system", content } : null;
 }
 

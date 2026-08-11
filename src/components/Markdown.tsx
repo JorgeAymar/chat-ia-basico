@@ -54,6 +54,71 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
   );
 }
 
+// Extensión de archivo por lenguaje detectado, para el nombre que sugiere
+// el botón "Descargar". Solo cubre los lenguajes que un modelo de chat
+// genera seguido; cualquier otro cae en .txt, que siempre es válido.
+const EXTENSION_BY_LANGUAGE: Record<string, string> = {
+  javascript: "js",
+  typescript: "ts",
+  jsx: "jsx",
+  tsx: "tsx",
+  python: "py",
+  ruby: "rb",
+  go: "go",
+  java: "java",
+  c: "c",
+  cpp: "cpp",
+  csharp: "cs",
+  rust: "rs",
+  php: "php",
+  bash: "sh",
+  shell: "sh",
+  sql: "sql",
+  json: "json",
+  yaml: "yml",
+  html: "html",
+  css: "css",
+  markdown: "md",
+};
+
+function downloadText(text: string, filename: string, mimeType: string) {
+  const blob = new Blob([text], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  // Sin esto el blob queda retenido en memoria hasta recargar la página.
+  URL.revokeObjectURL(url);
+}
+
+function DownloadButton({ text, filename }: { text: string; filename: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => downloadText(text, filename, "text/plain")}
+      aria-label={`Descargar ${filename}`}
+      title={`Descargar como ${filename}`}
+      className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+    >
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0">
+        <path
+          d="M8 2v8m0 0L5 7m3 3l3-3M3 12v1.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V12"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Descargar
+    </button>
+  );
+}
+
+// Contador global para que dos bloques de código sin lenguaje en la misma
+// respuesta no se pisen el nombre de archivo (los dos serían "codigo.txt").
+let anonymousBlockCounter = 0;
+
 function CodeBlock({ children }: { children: ReactNode }) {
   const child = (Array.isArray(children) ? children[0] : children) as
     | ReactElement<{ className?: string; children?: ReactNode }>
@@ -61,19 +126,27 @@ function CodeBlock({ children }: { children: ReactNode }) {
   const className = child?.props?.className ?? "";
   const language = /language-([\w-]+)/.exec(className)?.[1] ?? "";
   const code = extractText(child?.props?.children);
+  const extension = EXTENSION_BY_LANGUAGE[language] ?? "txt";
+  const filename = useMemo(
+    () => `codigo-${language || ++anonymousBlockCounter}.${extension}`,
+    [language, extension]
+  );
 
   return (
     // Fondo oscuro deliberado, distinto del resto de la burbuja: en el
     // sistema de diseño corporativo el código es la única superficie que se
     // permite contrastar fuerte, como en un editor. La cabecera se queda
-    // clara para que el nombre del lenguaje y "Copiar" no compitan con la
-    // sintaxis coloreada de abajo.
+    // clara para que el nombre del lenguaje y "Copiar"/"Descargar" no
+    // compitan con la sintaxis coloreada de abajo.
     <div className="group/code my-3 overflow-hidden rounded-lg border border-[var(--line)]">
       <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--void-2)] px-3 py-1">
         <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--ink-dim)]">
           {language || "texto"}
         </span>
-        <CopyButton text={code} label="Copiar código" />
+        <span className="flex items-center gap-0.5">
+          <DownloadButton text={code} filename={filename} />
+          <CopyButton text={code} label="Copiar código" />
+        </span>
       </div>
       <pre className="overflow-x-auto bg-[#1e1e1e] p-3 text-[12.5px] leading-relaxed">{children}</pre>
     </div>

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { consumeLoginToken } from "@/lib/auth/tokens";
+import { consumeLoginToken, peekLoginToken } from "@/lib/auth/tokens";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 
@@ -9,6 +9,27 @@ const ERROR_BY_REASON: Record<string, string> = {
   expired: "Este enlace de invitación venció. Pedile al administrador que te invite de nuevo.",
   used: "Este enlace de invitación ya se usó.",
 };
+
+// Lo llama la página apenas carga, con el token de la URL: solo para
+// mostrar a qué cuenta corresponde el link antes de pedir la contraseña. No
+// consume el token (ver peekLoginToken) — el POST de abajo es el único que
+// lo gasta.
+export async function GET(req: Request) {
+  const token = new URL(req.url).searchParams.get("token") ?? "";
+  if (!token) {
+    return Response.json({ error: "Falta el token de invitación" }, { status: 400 });
+  }
+
+  const result = await peekLoginToken(token, "INVITE");
+  if (!result.ok) {
+    return Response.json(
+      { error: ERROR_BY_REASON[result.reason], code: result.reason },
+      { status: 400 }
+    );
+  }
+
+  return Response.json({ email: result.email });
+}
 
 // El GET que mostraba el link nunca consume nada (es la página en
 // src/app/accept-invite/page.tsx); acá, en el POST, es donde se gasta el

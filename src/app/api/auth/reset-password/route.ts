@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { consumeLoginToken } from "@/lib/auth/tokens";
+import { consumeLoginToken, peekLoginToken } from "@/lib/auth/tokens";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 
@@ -9,6 +9,25 @@ const ERROR_BY_REASON: Record<string, string> = {
   expired: "Este enlace venció. Pedí uno nuevo desde \"Olvidé mi contraseña\".",
   used: "Este enlace ya se usó.",
 };
+
+// Igual que el GET de accept-invite: solo para mostrar a qué cuenta
+// corresponde el link, sin consumir el token.
+export async function GET(req: Request) {
+  const token = new URL(req.url).searchParams.get("token") ?? "";
+  if (!token) {
+    return Response.json({ error: "Falta el token" }, { status: 400 });
+  }
+
+  const result = await peekLoginToken(token, "RESET");
+  if (!result.ok) {
+    return Response.json(
+      { error: ERROR_BY_REASON[result.reason], code: result.reason },
+      { status: 400 }
+    );
+  }
+
+  return Response.json({ email: result.email });
+}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);

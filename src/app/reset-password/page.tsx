@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { APP_NAME } from "@/lib/app-info";
 import { PasswordForm } from "@/components/PasswordForm";
@@ -8,6 +8,37 @@ import { PasswordForm } from "@/components/PasswordForm";
 function ResetPasswordPageContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  // null: todavía no se resolvió. string: el email de la cuenta. false: el
+  // token no sirve (usado, vencido, inválido) — ver `checkError`.
+  const [email, setEmail] = useState<string | null | false>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`)
+      .then((res) => res.json().catch(() => null))
+      .then((data: { email?: string; error?: string } | null) => {
+        if (cancelled) return;
+        if (data?.email) {
+          setEmail(data.email);
+        } else {
+          setEmail(false);
+          setCheckError(data?.error ?? "Este enlace no es válido.");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEmail(false);
+          setCheckError("No pudimos conectar con el servidor. Probá de nuevo en unos minutos.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--void)] px-4">
@@ -15,21 +46,34 @@ function ResetPasswordPageContent() {
         <h1 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--ink)]">
           {APP_NAME}
         </h1>
-        <p className="mt-1 text-sm text-[var(--ink-dim)]">Elegí una nueva contraseña.</p>
 
-        {token ? (
-          <PasswordForm
-            endpoint="/api/auth/reset-password"
-            token={token}
-            submitLabel="Guardar contraseña"
-            loadingLabel="Guardando…"
-          />
-        ) : (
+        {!token ? (
           <div aria-live="polite" className="mt-4">
             <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
               Este enlace no es válido: falta el token.
             </p>
           </div>
+        ) : email === null ? (
+          <p className="mt-2 text-sm text-[var(--ink-dim)]">Comprobando el enlace…</p>
+        ) : email === false ? (
+          <div aria-live="polite" className="mt-4">
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+              {checkError}
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="mt-1 text-sm text-[var(--ink-dim)]">
+              Elegí una nueva contraseña para{" "}
+              <span className="font-medium text-[var(--ink)]">{email}</span>.
+            </p>
+            <PasswordForm
+              endpoint="/api/auth/reset-password"
+              token={token}
+              submitLabel="Guardar contraseña"
+              loadingLabel="Guardando…"
+            />
+          </>
         )}
       </div>
     </main>

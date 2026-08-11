@@ -30,6 +30,33 @@ export type ConsumeTokenResult =
   | { ok: true; userId: string }
   | { ok: false; reason: "not_found" | "expired" | "used" | "wrong_purpose" };
 
+export type PeekTokenResult =
+  | { ok: true; email: string }
+  | { ok: false; reason: "not_found" | "expired" | "used" | "wrong_purpose" };
+
+// A diferencia de consumeLoginToken, esto NO marca el token como usado: lo
+// llaman las páginas de crear/restablecer contraseña apenas cargan, solo
+// para mostrar a qué cuenta corresponde el link antes de que la persona
+// escriba nada. Consumirlo acá rompería el flujo real (el POST de después
+// lo encontraría ya usado).
+export async function peekLoginToken(
+  rawToken: string,
+  expectedPurpose: TokenPurpose
+): Promise<PeekTokenResult> {
+  const tokenHash = hashToken(rawToken);
+  const token = await prisma.loginToken.findUnique({
+    where: { tokenHash },
+    include: { user: { select: { email: true } } },
+  });
+
+  if (!token) return { ok: false, reason: "not_found" };
+  if (token.usedAt) return { ok: false, reason: "used" };
+  if (token.expiresAt < new Date()) return { ok: false, reason: "expired" };
+  if (token.purpose !== expectedPurpose) return { ok: false, reason: "wrong_purpose" };
+
+  return { ok: true, email: token.user.email };
+}
+
 // Un token se consume una sola vez: `usedAt` se pisa en la misma consulta que
 // lo valida, así dos requests casi simultáneos con el mismo link (el clásico
 // "el usuario hizo doble clic", o un escáner de link-preview de algunos
