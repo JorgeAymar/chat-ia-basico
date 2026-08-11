@@ -6,7 +6,7 @@ import { createSession } from "@/lib/auth/session";
 const ERROR_BY_REASON: Record<string, string> = {
   not_found: "Este enlace no es válido.",
   wrong_purpose: "Este enlace no es válido.",
-  expired: "Este enlace venció. Pedí uno nuevo desde \"Olvidé mi contraseña\".",
+  expired: "Este enlace venció. Pide uno nuevo desde \"Olvidé mi contraseña\".",
   used: "Este enlace ya se usó.",
 };
 

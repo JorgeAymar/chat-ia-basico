@@ -10,7 +10,7 @@ const mockedReadFile = readFile as jest.Mock;
 const mockedWriteFile = writeFile as jest.Mock;
 
 const DEFAULT_SYSTEM_PROMPT =
-  "Sos un asistente de chat útil, directo y conciso. Respondé en español salvo que te pidan explícitamente otro idioma.";
+  "Eres un asistente de chat útil, directo y conciso. Responde en español neutro salvo que te pidan explícitamente otro idioma.";
 
 describe("getSystemPrompt", () => {
   beforeEach(() => {

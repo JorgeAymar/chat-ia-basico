@@ -31,7 +31,7 @@ function AcceptInvitePageContent() {
       .catch(() => {
         if (!cancelled) {
           setEmail(false);
-          setCheckError("No pudimos conectar con el servidor. Probá de nuevo en unos minutos.");
+          setCheckError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
         }
       });
 
@@ -64,7 +64,7 @@ function AcceptInvitePageContent() {
         ) : (
           <>
             <p className="mt-1 text-sm text-[var(--ink-dim)]">
-              Creá tu contraseña para activar la cuenta de{" "}
+              Crea tu contraseña para activar la cuenta de{" "}
               <span className="font-medium text-[var(--ink)]">{email}</span>.
             </p>
             <PasswordForm

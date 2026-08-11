@@ -3,7 +3,7 @@ import path from "node:path";
 
 const SYSTEM_PROMPT_PATH = path.join(process.cwd(), "SYSTEM_PROMPT.md");
 const DEFAULT_SYSTEM_PROMPT =
-  "Sos un asistente de chat útil, directo y conciso. Respondé en español salvo que te pidan explícitamente otro idioma.";
+  "Eres un asistente de chat útil, directo y conciso. Responde en español neutro salvo que te pidan explícitamente otro idioma.";
 const MAX_SYSTEM_PROMPT_CHARS = 20_000;
 
 export async function getSystemPrompt(): Promise<string> {

@@ -39,13 +39,13 @@ function LoginPageContent() {
         | null;
 
       if (!data || !res.ok || !data.ok) {
-        setFormError(data?.error ?? "No pudimos procesar el pedido. Probá de nuevo.");
+        setFormError(data?.error ?? "No pudimos procesar el pedido. Vuelve a intentarlo.");
         return;
       }
 
       window.location.href = "/";
     } catch {
-      setFormError("No pudimos conectar con el servidor. Probá de nuevo en unos minutos.");
+      setFormError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ function LoginPageContent() {
           {APP_NAME}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-dim)]">
-          Ingresá con tu email y tu contraseña.
+          Ingresa con tu correo y tu contraseña.
         </p>
 
         <div aria-live="polite" className="mt-4 flex flex-col gap-2 empty:mt-0">
@@ -89,7 +89,7 @@ function LoginPageContent() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="vos@empresa.com"
+            placeholder="tu@empresa.com"
             className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
           />
 

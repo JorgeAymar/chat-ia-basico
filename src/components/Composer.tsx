@@ -200,7 +200,7 @@ export function Composer({
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
-          placeholder={disabled ? "No hay modelos instalados en Ollama" : "Escribí tu mensaje…"}
+          placeholder={disabled ? "No hay modelos instalados en Ollama" : "Escribe tu mensaje…"}
           disabled={disabled}
           autoFocus
           className="max-h-[200px] flex-1 resize-none overflow-y-auto bg-transparent py-2 text-sm leading-relaxed text-[var(--ink)] placeholder:text-[var(--ink-dim)] outline-none disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"

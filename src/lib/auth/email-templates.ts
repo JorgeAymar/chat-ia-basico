@@ -83,7 +83,7 @@ function baseTemplate(options: {
             <tr>
               <td style="padding:20px 32px 28px 32px;">
                 <p style="margin:0; font-size:12px; line-height:1.6; color:${INK_DIM}; font-family:${FONT_STACK}; word-break:break-all;">
-                  Si el botón no funciona, copiá y pegá este enlace en tu navegador:<br />
+                  Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
                   <a href="${buttonUrl}" style="color:${NAVY};">${buttonUrl}</a>
                 </p>
               </td>
@@ -108,22 +108,22 @@ export function renderInviteEmail(options: { email: string; acceptUrl: string; i
   return {
     subject: `${invitedByEmail} te invitó a ${APP_NAME}`,
     html: baseTemplate({
-      preheader: `Tenés una invitación a ${APP_NAME} de parte de ${invitedByEmail}.`,
+      preheader: `Tienes una invitación a ${APP_NAME} de parte de ${invitedByEmail}.`,
       heading: `${invitedByEmail} te invitó a sumarte a ${APP_NAME}`,
       bodyHtml: `
         <p style="margin:0 0 12px 0;">Hola,</p>
         <p style="margin:0 0 12px 0;">
           Te invitaron a usar <strong style="color:${INK};">${APP_NAME}</strong> con la cuenta
-          <strong style="color:${INK};">${email}</strong>. Tocá el botón de abajo para crear tu
+          <strong style="color:${INK};">${email}</strong>. Da clic en el botón de abajo para crear tu
           contraseña y activar tu acceso.
         </p>
         <p style="margin:0;">Este enlace vence en 7 días y solo funciona una vez.</p>
       `,
       buttonLabel: "Crear mi contraseña",
       buttonUrl: acceptUrl,
-      footerNote: `Si no esperabas esta invitación, podés ignorar este correo: tu dirección no queda registrada hasta que la aceptes.`,
+      footerNote: `Si no esperabas esta invitación, puedes ignorar este correo: tu dirección no queda registrada hasta que la aceptes.`,
     }),
-    text: `${invitedByEmail} te invitó a ${APP_NAME}.\n\nCreá tu contraseña con este enlace (vence en 7 días, un solo uso):\n${acceptUrl}\n\nSi no esperabas esta invitación, podés ignorar este correo.`,
+    text: `${invitedByEmail} te invitó a ${APP_NAME}.\n\nCrea tu contraseña con este enlace (vence en 7 días, un solo uso):\n${acceptUrl}\n\nSi no esperabas esta invitación, puedes ignorar este correo.`,
   };
 }
 
@@ -132,21 +132,21 @@ export function renderResetPasswordEmail(options: { email: string; resetUrl: str
   return {
     subject: `Restablecer tu contraseña de ${APP_NAME}`,
     html: baseTemplate({
-      preheader: `Elegí una contraseña nueva para tu cuenta de ${APP_NAME}.`,
+      preheader: `Elige una contraseña nueva para tu cuenta de ${APP_NAME}.`,
       heading: "Restablecer tu contraseña",
       bodyHtml: `
         <p style="margin:0 0 12px 0;">Hola,</p>
         <p style="margin:0 0 12px 0;">
           Pediste restablecer la contraseña de <strong style="color:${INK};">${APP_NAME}</strong> para
-          la cuenta <strong style="color:${INK};">${email}</strong>. Tocá el botón de abajo para elegir
-          una nueva.
+          la cuenta <strong style="color:${INK};">${email}</strong>. Da clic en el botón de abajo para
+          elegir una nueva.
         </p>
         <p style="margin:0;">Este enlace vence en 30 minutos y solo funciona una vez.</p>
       `,
       buttonLabel: "Elegir nueva contraseña",
       buttonUrl: resetUrl,
-      footerNote: `Si no pediste este cambio, podés ignorar este correo: tu contraseña actual sigue funcionando sin cambios.`,
+      footerNote: `Si no pediste este cambio, puedes ignorar este correo: tu contraseña actual sigue funcionando sin cambios.`,
     }),
-    text: `Restablecer tu contraseña de ${APP_NAME} (vence en 30 minutos, un solo uso):\n${resetUrl}\n\nSi no pediste este cambio, podés ignorar este correo.`,
+    text: `Restablecer tu contraseña de ${APP_NAME} (vence en 30 minutos, un solo uso):\n${resetUrl}\n\nSi no pediste este cambio, puedes ignorar este correo.`,
   };
 }

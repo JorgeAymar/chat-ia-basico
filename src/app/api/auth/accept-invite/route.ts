@@ -6,7 +6,7 @@ import { createSession } from "@/lib/auth/session";
 const ERROR_BY_REASON: Record<string, string> = {
   not_found: "Este enlace de invitación no es válido.",
   wrong_purpose: "Este enlace de invitación no es válido.",
-  expired: "Este enlace de invitación venció. Pedile al administrador que te invite de nuevo.",
+  expired: "Este enlace de invitación venció. Pídele al administrador que te vuelva a invitar.",
   used: "Este enlace de invitación ya se usó.",
 };
 

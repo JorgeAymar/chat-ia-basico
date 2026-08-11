@@ -23,10 +23,10 @@ const MAX_ATTACHMENTS = 5;
 const SERVER_PARSED = /\.(pdf|docx)$/i;
 
 const SUGGESTIONS = [
-  "Explicame qué hace este código y dónde puede fallar",
+  "Explícame qué hace este código y dónde puede fallar",
   "¿Qué salió esta semana en el mundo de la IA?",
-  "Ayudame a escribir un correo pidiendo una reunión",
-  "Compará Postgres y SQLite para un proyecto chico",
+  "Ayúdame a escribir un correo pidiendo una reunión",
+  "Compara Postgres y SQLite para un proyecto pequeño",
 ];
 
 // Lo que el listener global de atajos necesita saber en el momento en que se

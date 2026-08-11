@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
 
   if (!isValidEmail(email)) {
-    return Response.json({ error: "Ingresá un email válido" }, { status: 400 });
+    return Response.json({ error: "Ingresa un correo válido" }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({ where: { email } });

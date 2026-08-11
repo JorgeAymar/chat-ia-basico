@@ -63,13 +63,13 @@ export function PasswordForm({
         | null;
 
       if (!data || !res.ok || !data.ok) {
-        setError(data?.error ?? "No pudimos procesar el pedido. Probá de nuevo.");
+        setError(data?.error ?? "No pudimos procesar el pedido. Vuelve a intentarlo.");
         return;
       }
 
       window.location.href = "/";
     } catch {
-      setError("No pudimos conectar con el servidor. Probá de nuevo en unos minutos.");
+      setError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,7 @@ export function PasswordForm({
         htmlFor="confirm-password"
         className="mt-3 block text-xs font-semibold uppercase tracking-widest text-[var(--ink-dim)]"
       >
-        Repetí la contraseña
+        Confirma la contraseña
       </label>
       <input
         id="confirm-password"

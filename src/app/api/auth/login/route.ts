@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   const password = typeof body?.password === "string" ? body.password : "";
 
   if (!isValidEmail(email) || !password) {
-    return Response.json({ error: "Ingresá tu email y tu contraseña" }, { status: 400 });
+    return Response.json({ error: "Ingresa tu correo y tu contraseña" }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({ where: { email } });

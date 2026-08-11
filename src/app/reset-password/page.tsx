@@ -31,7 +31,7 @@ function ResetPasswordPageContent() {
       .catch(() => {
         if (!cancelled) {
           setEmail(false);
-          setCheckError("No pudimos conectar con el servidor. Probá de nuevo en unos minutos.");
+          setCheckError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
         }
       });
 
@@ -64,7 +64,7 @@ function ResetPasswordPageContent() {
         ) : (
           <>
             <p className="mt-1 text-sm text-[var(--ink-dim)]">
-              Elegí una nueva contraseña para{" "}
+              Elige una nueva contraseña para{" "}
               <span className="font-medium text-[var(--ink)]">{email}</span>.
             </p>
             <PasswordForm

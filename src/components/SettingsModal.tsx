@@ -238,7 +238,7 @@ export function SettingsModal({
                   Usuarios
                 </p>
                 <p className="mt-1 text-xs text-[var(--ink-dim)]">
-                  Solo vos, como owner, podés invitar gente a esta app.
+                  Solo tú, como owner, puedes invitar gente a esta app.
                 </p>
                 <form
                   onSubmit={(e) => {

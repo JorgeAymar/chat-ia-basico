@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
       // revela si el email tiene cuenta); un `!res.ok` acá es un error real
       // (400 de email inválido) y no "cuenta inexistente".
       if (!data || !res.ok || !data.ok) {
-        setFormError(data?.error ?? "No pudimos procesar el pedido. Probá de nuevo.");
+        setFormError(data?.error ?? "No pudimos procesar el pedido. Vuelve a intentarlo.");
         return;
       }
 
@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
       );
       setDevResetUrl(data.devResetUrl ?? null);
     } catch {
-      setFormError("No pudimos conectar con el servidor. Probá de nuevo en unos minutos.");
+      setFormError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,7 @@ export default function ForgotPasswordPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="vos@empresa.com"
+              placeholder="tu@empresa.com"
               className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
             />
             <button
