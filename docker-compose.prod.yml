@@ -60,6 +60,19 @@ services:
       postgres:
         condition: service_healthy
 
+networks:
+  # Subred explícita: el pool de subredes que Docker asigna automáticamente
+  # se agota rápido en un VPS compartido con muchos stacks (cada red bridge
+  # default se come una). Sin esto, `docker compose up` falla con "all
+  # predefined address pools have been fully subnetted" — elegí una libre
+  # con `docker network inspect $(docker network ls -q) --format
+  # '{{.Name}}: {{range .IPAM.Config}}{{.Subnet}}{{end}}'` antes del primer
+  # deploy en una máquina nueva.
+  default:
+    ipam:
+      config:
+        - subnet: "${ORION_NETWORK_SUBNET:?falta ORION_NETWORK_SUBNET en .env.production}"
+
 volumes:
   postgres-data:
   searxng-cache:
