@@ -120,4 +120,4 @@ if [ -n "$CURRENT_PORT" ] && [ "$OLD_NAME" != "$NEW_NAME" ]; then
   docker rm -f "$OLD_NAME" >/dev/null 2>&1 || true
 fi
 
-echo "==> Listo. orion.labshub.cc sirve desde ${NEW_NAME} (:${NEW_PORT})."
+echo "==> Listo. ${APP_URL:-la app} sirve desde ${NEW_NAME} (:${NEW_PORT})."
