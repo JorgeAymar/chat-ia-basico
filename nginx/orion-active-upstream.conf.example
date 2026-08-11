@@ -4,4 +4,4 @@
 # línea con el puerto del contenedor activo (ORION_BLUE_PORT o
 # ORION_GREEN_PORT, ver .env.production.example). El valor de abajo es
 # solo un ejemplo para arrancar el archivo antes del primer deploy.
-server 127.0.0.1:3011;
+server 127.0.0.1:8112;
