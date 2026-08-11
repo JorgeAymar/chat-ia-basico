@@ -39,13 +39,13 @@ docker build -t orion-app:latest --target runner .
 
 mkdir -p "$(dirname "$STATE_FILE")"
 CURRENT_PORT="$(cat "$STATE_FILE" 2>/dev/null || echo "")"
-if [ "$CURRENT_PORT" = "3001" ]; then
-  NEW_PORT=3002
-elif [ "$CURRENT_PORT" = "3002" ]; then
-  NEW_PORT=3001
+if [ "$CURRENT_PORT" = "3011" ]; then
+  NEW_PORT=3012
+elif [ "$CURRENT_PORT" = "3012" ]; then
+  NEW_PORT=3011
 else
   # Primer despliegue: no hay contenedor previo corriendo.
-  NEW_PORT=3001
+  NEW_PORT=3011
 fi
 NEW_NAME="orion-app-${NEW_PORT}"
 OLD_NAME="orion-app-${CURRENT_PORT}"
