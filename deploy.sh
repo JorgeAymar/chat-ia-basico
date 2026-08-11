@@ -23,11 +23,6 @@ cd "$PROJECT_DIR"
 ENV_FILE="${ENV_FILE:-.env.production}"
 COMPOSE_PROJECT="orion"
 NETWORK="${COMPOSE_PROJECT}_default"
-STATE_FILE="${ORION_STATE_FILE:-/etc/orion/active_port}"
-NGINX_UPSTREAM_FILE="${ORION_NGINX_UPSTREAM_FILE:-/etc/nginx/orion-active-upstream.conf}"
-HEALTH_PATH="${ORION_HEALTH_PATH:-/api/health}"
-HEALTH_RETRIES="${ORION_HEALTH_RETRIES:-30}"
-HEALTH_DELAY="${ORION_HEALTH_DELAY:-2}"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Falta $ENV_FILE — copiá .env.production.example y completá los valores reales." >&2
@@ -36,7 +31,13 @@ fi
 
 # Trae ORION_BLUE_PORT/ORION_GREEN_PORT (y cualquier otra var de $ENV_FILE)
 # a este shell — hasta acá solo se los pasábamos al contenedor con
-# --env-file, no estaban disponibles para la lógica del script.
+# --env-file, no estaban disponibles para la lógica del script. Tiene que
+# pasar ANTES de resolver STATE_FILE/NGINX_UPSTREAM_FILE/HEALTH_* de abajo:
+# si se resuelven primero con `${ORION_STATE_FILE:-default}`, la variable
+# todavía no existe en este shell y el override del .env se ignora en
+# silencio (bug real: pasó en un despliegue con rutas custom, que terminó
+# escribiendo en las rutas por defecto mientras nginx seguía apuntando al
+# archivo custom con el puerto viejo).
 set -o allexport
 # shellcheck disable=SC1090
 source "$ENV_FILE"
@@ -46,6 +47,12 @@ set +o allexport
 : "${ORION_GREEN_PORT:?falta ORION_GREEN_PORT en $ENV_FILE (ver .env.production.example)}"
 BLUE_PORT="$ORION_BLUE_PORT"
 GREEN_PORT="$ORION_GREEN_PORT"
+
+STATE_FILE="${ORION_STATE_FILE:-/etc/orion/active_port}"
+NGINX_UPSTREAM_FILE="${ORION_NGINX_UPSTREAM_FILE:-/etc/nginx/orion-active-upstream.conf}"
+HEALTH_PATH="${ORION_HEALTH_PATH:-/api/health}"
+HEALTH_RETRIES="${ORION_HEALTH_RETRIES:-30}"
+HEALTH_DELAY="${ORION_HEALTH_DELAY:-2}"
 
 echo "==> Levantando postgres/searxng (si no estaban) y aplicando migraciones…"
 docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" up -d postgres searxng
