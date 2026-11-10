@@ -22,7 +22,13 @@ export default async function proxy(req: NextRequest) {
   const session = await decryptSessionCookie(req.cookies.get(COOKIE_NAME)?.value);
 
   if (!isPublic && !session) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    // La raíz es la única página protegida que puede pisar alguien sin
+    // cuenta (todo lo demás no autenticado ya cae en PUBLIC_PATHS): en vez
+    // de un formulario de login sin contexto, que vea primero la landing
+    // (orion-chat-landing/, HTML estático servido directo por nginx en
+    // /presentacion — nunca llega a este proceso de Next).
+    const destination = pathname === "/" ? "/presentacion" : "/login";
+    return NextResponse.redirect(new URL(destination, req.url));
   }
 
   if (isPublic && session) {
