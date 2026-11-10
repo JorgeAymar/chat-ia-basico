@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { createEventDecoder, type Source } from "@/lib/stream";
 import type { Conversation, CurrentUser, Message } from "@/lib/types";
+import { apiUrl } from "@/lib/base-path";
 
 // Mismo agrupado por fecha que src/components/Sidebar.tsx (cliente web) —
 // ver el comentario ahí sobre por qué (historial largo, difícil de escanear
@@ -41,13 +42,17 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "No se pudo iniciar sesión");
+      // Un 500 sin cuerpo (el backend cayó, no un login inválido) no trae
+      // JSON — sin el `.catch` acá, `res.json()` tira y el usuario termina
+      // viendo el parse error crudo ("Unexpected end of JSON input") en vez
+      // de un mensaje que tenga sentido.
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "No se pudo iniciar sesión. Probá de nuevo.");
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
@@ -72,6 +77,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         </label>
         <input
           type="email"
+          autoComplete="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -83,6 +89,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         </label>
         <input
           type="password"
+          autoComplete="current-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -158,15 +165,29 @@ export default function Home() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const refreshConversations = useCallback(async () => {
-    const res = await fetch("/api/conversations");
-    const data = await res.json();
-    setConversations(data.conversations ?? []);
+    try {
+      const res = await fetch(apiUrl("/api/conversations"));
+      const data = await res.json();
+      setConversations(data.conversations ?? []);
+    } catch {
+      // Silencioso: un refresco de historial fallido no debería tirar abajo
+      // la pantalla de chat que ya está andando.
+    }
   }, []);
 
+  // Sin try/catch acá, un 500 del backend (o la red cortada) dejaba
+  // `currentUser` en `undefined` para siempre — y con eso en `undefined` el
+  // componente renderiza `null` sin ningún aviso: pantalla en blanco
+  // permanente, sin way de reintentar. Un error acá se trata como "no hay
+  // sesión" (null), igual que el cliente web (ver su page.tsx).
   const loadSession = useCallback(async () => {
-    const res = await fetch("/api/auth/me");
-    const data = await res.json();
-    setCurrentUser(data.user ?? null);
+    try {
+      const res = await fetch(apiUrl("/api/auth/me"));
+      const data = await res.json();
+      setCurrentUser(data.user ?? null);
+    } catch {
+      setCurrentUser(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -175,11 +196,15 @@ export default function Home() {
 
   useEffect(() => {
     if (!currentUser) return;
-    fetch("/api/models")
+    fetch(apiUrl("/api/models"))
       .then((r) => r.json())
       .then((data) => {
         setModels(data.models ?? []);
         setSelectedModel(data.defaultModel ?? "");
+      })
+      .catch(() => {
+        // Silencioso: `models` se queda en [], y el composer deshabilita el
+        // envío por eso (ver `ready` más abajo).
       });
     refreshConversations();
   }, [currentUser, refreshConversations]);
@@ -191,7 +216,7 @@ export default function Home() {
   async function handleSelectConversation(id: string) {
     setDrawerOpen(false);
     setActiveId(id);
-    const res = await fetch(`/api/conversations/${id}`);
+    const res = await fetch(apiUrl(`/api/conversations/${id}`));
     const data = await res.json();
     if (res.ok) {
       setMessages(data.conversation.messages);
@@ -207,13 +232,13 @@ export default function Home() {
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(apiUrl("/api/auth/logout"), { method: "POST" });
     setCurrentUser(null);
   }
 
   async function ensureConversation(): Promise<string | null> {
     if (activeId) return activeId;
-    const res = await fetch("/api/conversations", {
+    const res = await fetch(apiUrl("/api/conversations"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: selectedModel }),
@@ -249,7 +274,7 @@ export default function Home() {
     setError(null);
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch(apiUrl("/api/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId, message: userText, attachments: [], webSearch }),
@@ -294,6 +319,11 @@ export default function Home() {
   const pinned = conversations.filter((c) => c.pinned);
   const historyGroups = groupByDate(conversations.filter((c) => !c.pinned));
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? "Nueva conversación";
+  // Sin esto, con Ollama caído (`models` vacío) el botón de enviar seguía
+  // habilitado y el único feedback era el error devuelto por
+  // `ensureConversation` después de ya haber mostrado el mensaje del
+  // usuario en pantalla — igual que el cliente web (ver su `ready`).
+  const ready = models.length > 0;
 
   return (
     <div className="flex h-dvh flex-col bg-[var(--void)] text-[var(--ink)]">
@@ -361,14 +391,15 @@ export default function Home() {
                 handleSend();
               }
             }}
-            placeholder="Escribí un mensaje…"
+            placeholder={ready ? "Escribí un mensaje…" : "Conectando con Ollama…"}
+            disabled={!ready}
             rows={1}
-            className="max-h-32 min-h-[2rem] flex-1 resize-none bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)]"
+            className="max-h-32 min-h-[2rem] flex-1 resize-none bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] disabled:opacity-50"
           />
           <button
             type="button"
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
+            disabled={!ready || !input.trim() || isStreaming}
             aria-label="Enviar"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-bright)] text-[var(--void)] shadow-[var(--shadow-glow)] disabled:opacity-40"
           >

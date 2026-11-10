@@ -1,12 +1,9 @@
 import { ImageResponse } from "next/og";
 
-// Mismo diseño que src/app/apple-icon.tsx (cliente web) — ver icon.tsx acá
-// mismo. En esta app SÍ importa que sea nítido: es la PWA pensada para
-// "agregar a inicio" en iOS.
-export const size = { width: 180, height: 180 };
-export const contentType = "image/png";
-
-export default function AppleIcon() {
+// Ruta fija, NO la convención especial `apple-icon.tsx` — ver el comentario
+// en icon-32/route.tsx. Este es el que importa que sea nítido: es el que
+// usa iOS para "agregar a inicio".
+export async function GET() {
   return new ImageResponse(
     (
       <svg width={180} height={180} viewBox="0 0 32 32" fill="none">
@@ -15,6 +12,6 @@ export default function AppleIcon() {
         <circle cx="23" cy="9" r="2.6" fill="#f2994a" />
       </svg>
     ),
-    { ...size }
+    { width: 180, height: 180 }
   );
 }
