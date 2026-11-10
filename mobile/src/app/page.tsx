@@ -34,6 +34,7 @@ function groupByDate(items: Conversation[]): [string, Conversation[]][] {
 function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -87,14 +88,35 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         <label className="mt-4 block font-[family-name:var(--font-body)] text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-dim)]">
           Contraseña
         </label>
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-[var(--line)] bg-[var(--void)] px-3 py-2.5 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
-        />
+        <div className="relative mt-1.5">
+          <input
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-lg border border-[var(--line)] bg-[var(--void)] px-3 py-2.5 pr-10 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={showPassword}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-[var(--ink-dim)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+          >
+            {showPassword ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M1.5 1.5l13 13M6.7 6.8a2 2 0 002.6 2.6M4.3 4.3C2.6 5.4 1.3 7 1 8c.7 2.2 3.2 5 7 5 1.3 0 2.4-.3 3.4-.8M10.6 3.7A8.3 8.3 0 0115 8c-.3.9-1 2-1.9 2.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
+            )}
+          </button>
+        </div>
 
         {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
 
