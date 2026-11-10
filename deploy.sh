@@ -84,7 +84,7 @@ for name in orion-postgres-1 orion-searxng-1; do
 done
 
 echo "==> Aplicando migraciones…"
-docker build -t orion-migrate:latest --target migrator .
+docker build -t orion-migrate:latest --target migrator orion-chat-web/
 : "${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en $ENV_FILE}"
 DATABASE_URL="postgresql://${POSTGRES_USER:-chatuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-chat_ia_basico}?schema=public"
 ok=""
@@ -99,7 +99,7 @@ done
 docker run --rm --network "$NETWORK" -e DATABASE_URL="$DATABASE_URL" orion-migrate:latest
 
 echo "==> Construyendo la imagen de la app…"
-docker build -t orion-app:latest --target runner .
+docker build -t orion-app:latest --target runner orion-chat-web/
 
 mkdir -p "$(dirname "$STATE_FILE")"
 CURRENT_PORT="$(cat "$STATE_FILE" 2>/dev/null || echo "")"
@@ -180,14 +180,14 @@ MOBILE_GREEN_PORT="$ORION_MOBILE_GREEN_PORT"
 
 MOBILE_STATE_FILE="${ORION_MOBILE_STATE_FILE:-/etc/orion/mobile_active_port}"
 MOBILE_NGINX_UPSTREAM_FILE="${ORION_MOBILE_NGINX_UPSTREAM_FILE:-/etc/nginx/orion-mobile-active-upstream.conf}"
-# Sin /api/health propio (esta app no tiene backend, ver mobile/next.config.ts):
+# Sin /api/health propio (esta app no tiene backend, ver orion-chat-mobile/next.config.ts):
 # se chequea el root bajo /m, que basePath sirve en 200 sin slash final.
 MOBILE_HEALTH_PATH="${ORION_MOBILE_HEALTH_PATH:-/m}"
 
 echo "==> Construyendo la imagen de la app mobile…"
-# Contexto mobile/, NO la raíz del repo: es un proyecto Next.js aparte con
-# su propio package.json/Dockerfile (ver mobile/Dockerfile).
-docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m -t orion-mobile:latest mobile/
+# Contexto orion-chat-mobile/, NO la raíz del repo: es un proyecto Next.js
+# aparte con su propio package.json/Dockerfile (ver su Dockerfile ahí).
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m -t orion-mobile:latest orion-chat-mobile/
 
 mkdir -p "$(dirname "$MOBILE_STATE_FILE")"
 MOBILE_CURRENT_PORT="$(cat "$MOBILE_STATE_FILE" 2>/dev/null || echo "")"

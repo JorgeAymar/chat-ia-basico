@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+/orion-chat-web/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,14 +11,14 @@
 !.yarn/versions
 
 # testing
-/coverage
+/orion-chat-web/coverage
 
 # next.js
-/.next/
-/out/
+/orion-chat-web/.next/
+/orion-chat-web/out/
 
 # production
-/build
+/orion-chat-web/build
 
 # misc
 .DS_Store
@@ -42,22 +42,22 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+/orion-chat-web/src/generated/prisma
 
-# mobile/ es un proyecto Next.js aparte (ver mobile/next.config.ts) con su
-# propio ciclo de build — los patrones de arriba son con slash inicial
-# (anclados a la raíz) y no lo alcanzan.
-/mobile/node_modules
-/mobile/.next/
-/mobile/next-env.d.ts
-/mobile/*.tsbuildinfo
-/mobile/.env*
-!/mobile/.env.example
+# orion-chat-mobile/ es un proyecto Next.js aparte (ver su next.config.ts)
+# con su propio ciclo de build — los patrones de arriba son con slash
+# inicial (anclados a la raíz) y no lo alcanzan.
+/orion-chat-mobile/node_modules
+/orion-chat-mobile/.next/
+/orion-chat-mobile/next-env.d.ts
+/orion-chat-mobile/*.tsbuildinfo
+/orion-chat-mobile/.env*
+!/orion-chat-mobile/.env.example
 
 # Playwright
-/test-results/
-/playwright-report/
-/playwright/.cache/
+/orion-chat-web/test-results/
+/orion-chat-web/playwright-report/
+/orion-chat-web/playwright/.cache/
 # Cookies de la sesión de test que genera e2e/global-setup.ts.
-/e2e/.auth/
+/orion-chat-web/e2e/.auth/
 .gstack/

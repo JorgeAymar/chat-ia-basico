@@ -70,7 +70,7 @@ services:
   # corre con `docker run` directo.
   migrate:
     build:
-      context: .
+      context: ./orion-chat-web
       dockerfile: Dockerfile
       target: migrator
     restart: "no"

@@ -1,1 +1,1 @@
-@AGENTS.md
+@orion-chat-web/AGENTS.md
