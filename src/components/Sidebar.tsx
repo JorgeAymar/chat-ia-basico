@@ -6,6 +6,35 @@ import { APP_NAME, APP_VERSION } from "@/lib/app-info";
 import { Logo } from "@/components/Logo";
 import type { Conversation } from "@/lib/types";
 
+// Agrupa el historial (no las fijadas) por antigüedad, como myTV/Stitch de
+// referencia mostraban "Hoy/Ayer/Últimos 7 días": con el historial largo que
+// junta un uso real, una lista plana se vuelve difícil de escanear mucho
+// antes de que el buscador haga falta.
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function groupByDate(items: Conversation[]): [string, Conversation[]][] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const groups = new Map<string, Conversation[]>();
+  for (const c of items) {
+    const diff = startOfToday - new Date(c.updatedAt).setHours(0, 0, 0, 0);
+    const label =
+      diff < DAY_MS ? "Hoy" : diff < 2 * DAY_MS ? "Ayer" : diff < 7 * DAY_MS ? "Últimos 7 días" : "Más antiguas";
+    const bucket = groups.get(label);
+    if (bucket) bucket.push(c);
+    else groups.set(label, [c]);
+  }
+
+  // Devuelve solo los grupos que tienen contenido, en el orden fijo de más
+  // reciente a más antiguo (el orden de inserción de un Map no sirve: si no
+  // hay nada "Hoy", el primer grupo insertado podría ser "Ayer" seguido de
+  // "Más antiguas" antes que "Últimos 7 días").
+  return (["Hoy", "Ayer", "Últimos 7 días", "Más antiguas"] as const)
+    .filter((label) => groups.has(label))
+    .map((label) => [label, groups.get(label)!]);
+}
+
 type SidebarProps = {
   conversations: Conversation[];
   activeId: string | null;
@@ -35,6 +64,10 @@ type SidebarProps = {
   // no se muestra hasta tener el email real, para no parpadear vacío.
   currentUserEmail: string | null;
   onLogout: () => void;
+  // Para el hint de atajo en el buscador ("⌘K"/"CtrlK"). Se calcula una sola
+  // vez en page.tsx (ver su comentario sobre useSyncExternalStore) en vez de
+  // leer navigator acá, para no duplicar esa lógica.
+  isMac: boolean;
 };
 
 export function Sidebar({
@@ -56,6 +89,7 @@ export function Sidebar({
   ollamaOnline,
   ollamaUrl,
   ollamaRemote,
+  isMac,
   currentUserEmail,
   onLogout,
 }: SidebarProps) {
@@ -94,6 +128,7 @@ export function Sidebar({
   // dos grupos por separado para poder titularlos.
   const pinned = filtered.filter((c) => c.pinned);
   const rest = filtered.filter((c) => !c.pinned);
+  const historyGroups = groupByDate(rest);
 
   function renderItem(c: Conversation) {
     const active = c.id === activeId;
@@ -322,7 +357,7 @@ export function Sidebar({
             ref={searchInputRef}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Buscar conversaciones…"
+            placeholder={`Buscar conversaciones… (${isMac ? "⌘" : "Ctrl"}K)`}
             aria-label="Buscar conversaciones"
             className="w-full rounded-full border border-[var(--line)] bg-[var(--void)] py-1.5 pl-8 pr-8 text-xs text-[var(--ink)] placeholder:text-[var(--ink-dim)] outline-none transition-colors hover:border-[var(--accent)]/40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
           />
@@ -357,18 +392,14 @@ export function Sidebar({
             </>
           )}
 
-          {rest.length > 0 && (
-            <>
-              <p
-                className={`px-2 pb-2 font-[family-name:var(--font-label)] text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70 ${
-                  pinned.length > 0 ? "mt-5" : ""
-                }`}
-              >
-                Historial
+          {historyGroups.map(([label, items], i) => (
+            <div key={label} className={i > 0 || pinned.length > 0 ? "mt-5" : ""}>
+              <p className="px-2 pb-2 font-[family-name:var(--font-label)] text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
+                {label}
               </p>
-              <div className="flex flex-col gap-1">{rest.map(renderItem)}</div>
-            </>
-          )}
+              <div className="flex flex-col gap-1">{items.map(renderItem)}</div>
+            </div>
+          ))}
         </div>
 
         <div className="border-t border-[var(--line)] px-4 py-3">

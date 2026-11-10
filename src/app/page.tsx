@@ -851,6 +851,7 @@ export default function Home() {
         ollamaRemote={ollamaRemote}
         currentUserEmail={currentUser?.email ?? null}
         onLogout={handleLogout}
+        isMac={isMac}
       />
 
       {/* tabIndex -1 para que el enlace "saltar al contenido" tenga dónde
