@@ -44,6 +44,16 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# mobile/ es un proyecto Next.js aparte (ver mobile/next.config.ts) con su
+# propio ciclo de build — los patrones de arriba son con slash inicial
+# (anclados a la raíz) y no lo alcanzan.
+/mobile/node_modules
+/mobile/.next/
+/mobile/next-env.d.ts
+/mobile/*.tsbuildinfo
+/mobile/.env*
+!/mobile/.env.example
+
 # Playwright
 /test-results/
 /playwright-report/
