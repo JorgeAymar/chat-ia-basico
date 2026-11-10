@@ -1,23 +1,21 @@
 @import "tailwindcss";
 
-/* Paleta oscura "oliva": fondo casi negro con tinte verde, acento verde
-   oliva suave. Reemplaza la paleta "Orion Corporate" (navy/slate, claro) —
-   pensada para dar un aire más consumer/moderno que el look de panel
-   interno de empresa anterior. --shadow-glow estaba referenciada en
-   .skip-link pero nunca definida (token huérfano de la paleta vieja); acá
-   se define de verdad como un glow sutil coherente con el resto. */
+/* Paleta oscura "fintech navy": fondo azul marino profundo, acento naranja
+   vívido para CTAs (inspirado en una referencia de dashboard financiero).
+   Reemplaza la paleta oliva anterior — mismo mecanismo de siempre, solo
+   cambian los valores de los tokens. */
 :root {
-  --ink: #f3f4ec;
-  --ink-dim: #9ca496;
-  --void: #15170f;
-  --void-2: #1b1e14;
-  --panel: #1e2219;
-  --panel-2: #262b1e;
-  --line: #333826;
-  --accent: #7c8f5e;
-  --accent-bright: #a9c08e;
-  --accent-dim: rgba(169, 192, 142, 0.12);
-  --shadow-glow: 0 0 24px rgba(169, 192, 142, 0.35);
+  --ink: #eef2fa;
+  --ink-dim: #8a9bb8;
+  --void: #0f1b30;
+  --void-2: #16233d;
+  --panel: #1c2d4a;
+  --panel-2: #24375a;
+  --line: #33456b;
+  --accent: #3d5a80;
+  --accent-bright: #f2994a;
+  --accent-dim: rgba(242, 153, 74, 0.12);
+  --shadow-glow: 0 0 24px rgba(242, 153, 74, 0.35);
 }
 
 @theme inline {

@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { Sora, Inter } from "next/font/google";
 // Los estilos de KaTeX vienen del paquete: sin esto las fórmulas se
 // renderizan como una pila de spans sueltos ilegible.
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import { APP_NAME } from "@/lib/app-info";
 
-// Tipografía del rediseño oscuro/oliva: Plus Jakarta Sans para títulos (su
-// geometría redondeada y amigable es justo el aire "producto de consumo"
-// que la paleta anterior evitaba a propósito), Inter para el cuerpo —se
-// mantiene, ya es neutra y legible para texto de chat/UI.
-const plusJakarta = Plus_Jakarta_Sans({
+// Tipografía del rediseño "fintech navy": Sora para títulos (geometría
+// condensada y moderna, el estilo típico de dashboard financiero de la
+// referencia), Inter para el cuerpo —se mantiene, ya es neutra y legible
+// para texto de chat/UI.
+const sora = Sora({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["600", "700", "800"],
@@ -35,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${plusJakarta.variable} ${inter.variable} h-full antialiased`}
+      className={`${sora.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
