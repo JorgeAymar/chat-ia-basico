@@ -92,7 +92,7 @@ while IFS='=' read -r key _; do
 done < <(grep -vE '^\s*(#|$)' "$ENV_FILE")
 
 docker rm -f "$NEW_NAME" >/dev/null 2>&1 || true
-docker run -d --name "$NEW_NAME" \
+docker run -d --memory 512m --memory-swap 512m --name "$NEW_NAME" \
   --network "$NETWORK" \
   -p "127.0.0.1:${NEW_PORT}:3000" \
   "${ENV_FLAGS[@]}" \

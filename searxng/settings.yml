@@ -37,6 +37,8 @@ server:
   image_proxy: false
 
 outgoing:
+  # UA distintivo requerido por Wikimedia (bloquea el UA generico de SearXNG con 403/429)
+  useragent_suffix: "(https://orion.labshub.cc)"
   # El default de 3s se queda corto cuando SearXNG consulta varios buscadores
   # y la app ya tiene su propio timeout de 8s por encima.
   request_timeout: 6.0

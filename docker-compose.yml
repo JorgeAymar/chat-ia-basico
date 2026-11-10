@@ -12,6 +12,8 @@ services:
       - "5436:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    mem_limit: 512m
+    memswap_limit: 512m
 
   # Metabuscador para la búsqueda web del chat. Consulta DuckDuckGo/Brave/
   # Mojeek por vos: no hace falta API key ni cuenta, y lo único que sale de
@@ -32,6 +34,8 @@ services:
       # settings.yml está versionado en el repo, ver el comentario de adentro.
       - ./searxng:/etc/searxng:rw
       - searxng-cache:/var/cache/searxng
+    mem_limit: 512m
+    memswap_limit: 512m
 
 volumes:
   postgres-data:

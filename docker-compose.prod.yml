@@ -32,6 +32,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    mem_limit: 512m
+    memswap_limit: 512m
 
   searxng:
     image: docker.io/searxng/searxng:latest
@@ -44,6 +46,8 @@ services:
     volumes:
       - ./searxng:/etc/searxng:rw
       - searxng-cache:/var/cache/searxng
+    mem_limit: 512m
+    memswap_limit: 512m
 
   # Job de una sola corrida: aplica las migraciones pendientes y termina.
   # deploy.sh lo corre con `docker compose run --rm migrate` antes de
