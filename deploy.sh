@@ -64,10 +64,39 @@ if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
   docker network create --subnet "$ORION_NETWORK_SUBNET" "$NETWORK"
 fi
 
-echo "==> Levantando postgres/searxng (si no estaban) y aplicando migraciones…"
-docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" up -d postgres searxng
-docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" build migrate
-docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" run --rm migrate
+# A propósito NO se usa `docker compose up`/`run` acá para postgres/searxng
+# ni para migrate: el servicio `migrate` tiene `depends_on: postgres` en
+# docker-compose.prod.yml, así que CUALQUIER invocación de Compose en este
+# proyecto arrastra a postgres al grafo de dependencias — y si el
+# config-hash que Compose guardó en el contenedor no matchea exacto (pasa
+# fácil: ids de red, labels, o un postgres creado alguna vez fuera de
+# Compose), Compose lo marca para recrear. Recrear la base en cada deploy
+# de código es exactamente la caída que "zero downtime" promete evitar. Acá
+# se asume que postgres/searxng YA están corriendo (los levanta una vez,
+# a mano, quien hace el setup inicial del VPS — ver docker-compose.prod.yml)
+# y deploy.sh nunca los toca.
+for name in orion-postgres-1 orion-searxng-1; do
+  if ! docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null | grep -q true; then
+    echo "!! ${name} no está corriendo. deploy.sh no gestiona postgres/searxng — levantalos una vez a mano:" >&2
+    echo "!!   docker compose -p ${COMPOSE_PROJECT} -f docker-compose.prod.yml --env-file ${ENV_FILE} up -d postgres searxng" >&2
+    exit 1
+  fi
+done
+
+echo "==> Aplicando migraciones…"
+docker build -t orion-migrate:latest --target migrator .
+: "${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en $ENV_FILE}"
+DATABASE_URL="postgresql://${POSTGRES_USER:-chatuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-chat_ia_basico}?schema=public"
+ok=""
+for _ in $(seq 1 "$HEALTH_RETRIES"); do
+  if docker exec orion-postgres-1 pg_isready -U "${POSTGRES_USER:-chatuser}" >/dev/null 2>&1; then
+    ok=1
+    break
+  fi
+  sleep "$HEALTH_DELAY"
+done
+[ -n "$ok" ] || { echo "!! postgres no contestó a tiempo (pg_isready)." >&2; exit 1; }
+docker run --rm --network "$NETWORK" -e DATABASE_URL="$DATABASE_URL" orion-migrate:latest
 
 echo "==> Construyendo la imagen de la app…"
 docker build -t orion-app:latest --target runner .

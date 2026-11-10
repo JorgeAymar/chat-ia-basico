@@ -1,4 +1,18 @@
-# Stack de producción. Dos piezas quedan AFUERA de este archivo a propósito:
+# Stack de producción. Este archivo se usa para el SETUP INICIAL del VPS
+# (`docker compose up -d postgres searxng`, una vez) — deploy.sh, en cada
+# despliegue de código, NO vuelve a invocar Compose contra este archivo.
+#
+# Por qué: el servicio `migrate` de acá abajo tiene `depends_on: postgres`,
+# así que cualquier `docker compose run/up` en este proyecto arrastra a
+# postgres al grafo de dependencias. Si el config-hash que Compose guardó
+# en el contenedor no matchea exacto con lo que resuelve ahora (pasa fácil:
+# un campo tocado acá, un postgres creado alguna vez fuera de Compose), lo
+# marca para recrear — y recrear la base de datos en cada deploy de código
+# es justo la caída que "zero downtime" promete evitar. deploy.sh en cambio
+# construye la imagen de `migrate` y la corre con `docker run` directo
+# (ver ahí), sin pasar nunca por el grafo de dependencias de Compose.
+#
+# Otras dos piezas quedan AFUERA de este archivo a propósito:
 #
 # - nginx corre en el host del VPS, no en un contenedor: manejar
 #   certificados Let's Encrypt con certbot es mucho más simple cuando nginx
@@ -50,8 +64,10 @@ services:
     memswap_limit: 512m
 
   # Job de una sola corrida: aplica las migraciones pendientes y termina.
-  # deploy.sh lo corre con `docker compose run --rm migrate` antes de
-  # levantar el contenedor nuevo de la app en cada despliegue.
+  # Queda acá como definición de referencia/para uso manual — deploy.sh NO
+  # lo corre vía Compose (ver el comentario grande arriba del archivo),
+  # construye esta misma imagen con `docker build --target migrator` y la
+  # corre con `docker run` directo.
   migrate:
     build:
       context: .
