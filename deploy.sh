@@ -54,6 +54,16 @@ HEALTH_PATH="${ORION_HEALTH_PATH:-/api/health}"
 HEALTH_RETRIES="${ORION_HEALTH_RETRIES:-30}"
 HEALTH_DELAY="${ORION_HEALTH_DELAY:-2}"
 
+# La red es `external: true` en docker-compose.prod.yml (ver el comentario
+# ahí): Compose ya no la crea ni la recrea, solo la referencia por nombre.
+# Acá se crea una única vez, la primera vez que corre esto en un VPS nuevo —
+# las corridas siguientes la encuentran existente y no la tocan.
+: "${ORION_NETWORK_SUBNET:?falta ORION_NETWORK_SUBNET en $ENV_FILE (ver .env.production.example)}"
+if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
+  echo "==> Creando la red ${NETWORK} (subred ${ORION_NETWORK_SUBNET})…"
+  docker network create --subnet "$ORION_NETWORK_SUBNET" "$NETWORK"
+fi
+
 echo "==> Levantando postgres/searxng (si no estaban) y aplicando migraciones…"
 docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" up -d postgres searxng
 docker compose -p "$COMPOSE_PROJECT" -f docker-compose.prod.yml --env-file "$ENV_FILE" build migrate

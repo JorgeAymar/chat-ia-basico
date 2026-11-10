@@ -65,17 +65,18 @@ services:
         condition: service_healthy
 
 networks:
-  # Subred explícita: el pool de subredes que Docker asigna automáticamente
-  # se agota rápido en un VPS compartido con muchos stacks (cada red bridge
-  # default se come una). Sin esto, `docker compose up` falla con "all
-  # predefined address pools have been fully subnetted" — elegí una libre
-  # con `docker network inspect $(docker network ls -q) --format
-  # '{{.Name}}: {{range .IPAM.Config}}{{.Subnet}}{{end}}'` antes del primer
-  # deploy en una máquina nueva.
+  # external: true — esta red la crea deploy.sh UNA sola vez (ver el guard
+  # con `docker network create` antes del primer `compose up`), no Compose
+  # en cada corrida. Sin esto, Compose compara su config resuelta contra el
+  # hash que guardó en la red al crearla y, ante cualquier diferencia (un
+  # campo cambiado en este archivo, un drift viejo, lo que sea), intenta
+  # BORRAR Y RECREAR la red — y aborta con "active endpoints" porque
+  # postgres/searxng/orion-app-* siguen enganchados. En un VPS compartido
+  # con contenedores de larga vida eso no es negociable: la red se crea una
+  # vez con la subred correcta y después no se vuelve a tocar.
   default:
-    ipam:
-      config:
-        - subnet: "${ORION_NETWORK_SUBNET:?falta ORION_NETWORK_SUBNET en .env.production}"
+    name: orion_default
+    external: true
 
 volumes:
   postgres-data:
