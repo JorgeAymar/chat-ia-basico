@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { shortModel } from "@/lib/model-utils";
 import { APP_NAME, APP_VERSION } from "@/lib/app-info";
+import { Logo } from "@/components/Logo";
 import type { Conversation } from "@/lib/types";
 
 type SidebarProps = {
@@ -230,8 +231,8 @@ export function Sidebar({
         }`}
       >
         <div className="flex items-center gap-2.5 px-5 pb-5 pt-6">
-          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--accent)] font-[family-name:var(--font-display)] text-xs font-bold text-white">
-            {APP_NAME.slice(0, 2).toUpperCase()}
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
+            <Logo className="h-8 w-8 rounded-md" />
             <span
               className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--panel)] ${
                 ollamaOnline === null

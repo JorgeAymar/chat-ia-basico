@@ -34,7 +34,10 @@ export default async function proxy(req: NextRequest) {
 
 // Deja pasar sin chequeo: las rutas de API (cada una valida su propia
 // sesión y responde JSON, no tiene sentido redirigirlas a /login con HTML),
-// los assets de Next y el favicon.
+// los assets de Next, y el favicon/icon/apple-icon (generados por
+// src/app/icon.tsx y apple-icon.tsx) — sin esto, un visitante sin sesión en
+// /login recibía un redirect en vez del ícono y la pestaña se quedaba sin
+// favicon.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon|apple-icon).*)"],
 };
