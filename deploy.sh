@@ -167,3 +167,80 @@ if [ -n "$CURRENT_PORT" ] && [ "$OLD_NAME" != "$NEW_NAME" ]; then
 fi
 
 echo "==> Listo. ${APP_URL:-la app} sirve desde ${NEW_NAME} (:${NEW_PORT})."
+
+# ── mobile (PWA bajo /m) ─────────────────────────────────────────────────
+# Mismo patrón blue/green que arriba, pero totalmente separado: su propio
+# par de puertos, su propio STATE_FILE y su propio archivo de upstream de
+# nginx, para que un deploy de mobile nunca pise el estado del deploy del
+# cliente web (y viceversa).
+: "${ORION_MOBILE_BLUE_PORT:?falta ORION_MOBILE_BLUE_PORT en $ENV_FILE (ver .env.production.example)}"
+: "${ORION_MOBILE_GREEN_PORT:?falta ORION_MOBILE_GREEN_PORT en $ENV_FILE (ver .env.production.example)}"
+MOBILE_BLUE_PORT="$ORION_MOBILE_BLUE_PORT"
+MOBILE_GREEN_PORT="$ORION_MOBILE_GREEN_PORT"
+
+MOBILE_STATE_FILE="${ORION_MOBILE_STATE_FILE:-/etc/orion/mobile_active_port}"
+MOBILE_NGINX_UPSTREAM_FILE="${ORION_MOBILE_NGINX_UPSTREAM_FILE:-/etc/nginx/orion-mobile-active-upstream.conf}"
+# Sin /api/health propio (esta app no tiene backend, ver mobile/next.config.ts):
+# se chequea el root bajo /m, que basePath sirve en 200 sin slash final.
+MOBILE_HEALTH_PATH="${ORION_MOBILE_HEALTH_PATH:-/m}"
+
+echo "==> Construyendo la imagen de la app mobile…"
+# Contexto mobile/, NO la raíz del repo: es un proyecto Next.js aparte con
+# su propio package.json/Dockerfile (ver mobile/Dockerfile).
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m -t orion-mobile:latest mobile/
+
+mkdir -p "$(dirname "$MOBILE_STATE_FILE")"
+MOBILE_CURRENT_PORT="$(cat "$MOBILE_STATE_FILE" 2>/dev/null || echo "")"
+if [ "$MOBILE_CURRENT_PORT" = "$MOBILE_BLUE_PORT" ]; then
+  MOBILE_NEW_PORT="$MOBILE_GREEN_PORT"
+elif [ "$MOBILE_CURRENT_PORT" = "$MOBILE_GREEN_PORT" ]; then
+  MOBILE_NEW_PORT="$MOBILE_BLUE_PORT"
+else
+  MOBILE_NEW_PORT="$MOBILE_BLUE_PORT"
+fi
+MOBILE_NEW_NAME="orion-mobile-${MOBILE_NEW_PORT}"
+MOBILE_OLD_NAME="orion-mobile-${MOBILE_CURRENT_PORT}"
+
+echo "==> Mobile activo hoy: puerto ${MOBILE_CURRENT_PORT:-ninguno (primer deploy)}. Nuevo: $MOBILE_NEW_PORT ($MOBILE_NEW_NAME)"
+
+docker rm -f "$MOBILE_NEW_NAME" >/dev/null 2>&1 || true
+# Sin --network: a diferencia de orion-app, este contenedor no necesita la
+# red orion_default — solo le pega a $APP_URL (el dominio público del
+# cliente web) por HTTPS normal, nunca a postgres/searxng directo. Se queda
+# en la bridge default de Docker.
+docker run -d --memory 256m --memory-swap 256m --name "$MOBILE_NEW_NAME" \
+  -p "127.0.0.1:${MOBILE_NEW_PORT}:3000" \
+  -e WEB_APP_ORIGIN="$APP_URL" \
+  -e NEXT_PUBLIC_BASE_PATH="/m" \
+  --restart unless-stopped \
+  orion-mobile:latest
+
+echo "==> Esperando a que ${MOBILE_NEW_NAME} conteste en :${MOBILE_NEW_PORT}${MOBILE_HEALTH_PATH}…"
+ok=""
+for _ in $(seq 1 "$HEALTH_RETRIES"); do
+  if curl -sf "http://127.0.0.1:${MOBILE_NEW_PORT}${MOBILE_HEALTH_PATH}" >/dev/null; then
+    ok=1
+    break
+  fi
+  sleep "$HEALTH_DELAY"
+done
+
+if [ -z "$ok" ]; then
+  echo "!! ${MOBILE_NEW_NAME} no contestó a tiempo. No se toca nginx ni se apaga nada viejo." >&2
+  echo "!! Revisá los logs: docker logs ${MOBILE_NEW_NAME}" >&2
+  exit 1
+fi
+
+echo "==> ${MOBILE_NEW_NAME} está sano. Apuntando nginx a :${MOBILE_NEW_PORT}…"
+echo "server 127.0.0.1:${MOBILE_NEW_PORT};" > "$MOBILE_NGINX_UPSTREAM_FILE"
+nginx -t
+systemctl reload nginx
+
+echo "$MOBILE_NEW_PORT" > "$MOBILE_STATE_FILE"
+
+if [ -n "$MOBILE_CURRENT_PORT" ] && [ "$MOBILE_OLD_NAME" != "$MOBILE_NEW_NAME" ]; then
+  echo "==> Apagando el contenedor mobile anterior (${MOBILE_OLD_NAME})…"
+  docker rm -f "$MOBILE_OLD_NAME" >/dev/null 2>&1 || true
+fi
+
+echo "==> Listo. ${APP_URL:-la app}/m sirve desde ${MOBILE_NEW_NAME} (:${MOBILE_NEW_PORT})."

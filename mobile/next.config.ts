@@ -19,6 +19,9 @@ const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN ?? "http://localhost:3000";
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {
+  // Genera `.next/standalone`: igual que el cliente web, para una imagen
+  // Docker liviana que no copia node_modules completo (ver Dockerfile).
+  output: "standalone",
   // Sin esto, Turbopack detecta el package-lock.json de la raíz del repo
   // (el del cliente web) y asume que ESTE proyecto vive en un monorepo con
   // ese directorio como root — con lo cual intenta resolver src/proxy.ts del
