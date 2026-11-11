@@ -169,20 +169,28 @@ fi
 
 echo "==> Listo. ${APP_URL:-la app}/app sirve desde ${NEW_NAME} (:${NEW_PORT})."
 
-# ── landing estática (/presentacion) ─────────────────────────────────────
-# Copia atómica: se arma en un dir temporal y se intercambia con `mv`, así
-# nginx nunca sirve una mezcla de archivos viejos y nuevos a mitad de copia.
-LANDING_DIR="${ORION_LANDING_DIR:-/var/www/orion-landing}"
+# Norma del VPS: cada app vive en su propia carpeta de /opt
+# (/opt/orion-chat-web = este checkout + infra, /opt/orion-chat-mobile,
+# /opt/orion-chat-landing). Las dos últimas se publican desde el checkout en
+# cada deploy con una copia atómica: se arma en un dir temporal y se
+# intercambia con `mv`, así nunca queda una mezcla de archivos viejos y
+# nuevos a mitad de copia.
+publish_dir() {
+  local src="$1" dest="$2"
+  local tmp="${dest}.tmp.$$"
+  rm -rf "$tmp" "${dest}.old"
+  mkdir -p "$(dirname "$dest")"
+  cp -r "$src" "$tmp"
+  chmod -R a+rX "$tmp"
+  [ -d "$dest" ] && mv "$dest" "${dest}.old"
+  mv "$tmp" "$dest"
+  rm -rf "${dest}.old"
+}
+
+# ── landing estática (raíz del sitio) ────────────────────────────────────
+LANDING_DIR="${ORION_LANDING_DIR:-/opt/orion-chat-landing}"
 echo "==> Publicando la landing en ${LANDING_DIR}…"
-LANDING_TMP="${LANDING_DIR}.tmp.$$"
-rm -rf "$LANDING_TMP"
-mkdir -p "$(dirname "$LANDING_DIR")"
-cp -r orion-chat-landing "$LANDING_TMP"
-chmod -R a+rX "$LANDING_TMP"
-rm -rf "${LANDING_DIR}.old"
-[ -d "$LANDING_DIR" ] && mv "$LANDING_DIR" "${LANDING_DIR}.old"
-mv "$LANDING_TMP" "$LANDING_DIR"
-rm -rf "${LANDING_DIR}.old"
+publish_dir orion-chat-landing "$LANDING_DIR"
 
 # ── mobile (PWA bajo /m) ─────────────────────────────────────────────────
 # Mismo patrón blue/green que arriba, pero totalmente separado: su propio
@@ -200,11 +208,15 @@ MOBILE_NGINX_UPSTREAM_FILE="${ORION_MOBILE_NGINX_UPSTREAM_FILE:-/etc/nginx/orion
 # se chequea el root bajo /m, que basePath sirve en 200 sin slash final.
 MOBILE_HEALTH_PATH="${ORION_MOBILE_HEALTH_PATH:-/m}"
 
+MOBILE_DIR="${ORION_MOBILE_DIR:-/opt/orion-chat-mobile}"
+echo "==> Publicando el código de la mobile en ${MOBILE_DIR}…"
+publish_dir orion-chat-mobile "$MOBILE_DIR"
+
 echo "==> Construyendo la imagen de la app mobile…"
-# Contexto orion-chat-mobile/, NO la raíz del repo: es un proyecto Next.js
-# aparte con su propio package.json/Dockerfile (ver su Dockerfile ahí).
+# Contexto = su carpeta en /opt, NO la raíz del repo: es un proyecto Next.js
+# aparte con su propio package.json/Dockerfile.
 : "${APP_URL:?falta APP_URL en $ENV_FILE (la mobile lo necesita en build time para sus rewrites)}"
-docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m --build-arg WEB_APP_ORIGIN="${APP_URL}/app" -t orion-mobile:latest orion-chat-mobile/
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m --build-arg WEB_APP_ORIGIN="${APP_URL}/app" -t orion-mobile:latest "$MOBILE_DIR"
 
 mkdir -p "$(dirname "$MOBILE_STATE_FILE")"
 MOBILE_CURRENT_PORT="$(cat "$MOBILE_STATE_FILE" 2>/dev/null || echo "")"

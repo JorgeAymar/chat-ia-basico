@@ -40,7 +40,9 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}"
       POSTGRES_DB: ${POSTGRES_DB:-chat_ia_basico}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Norma del VPS: los datos viven en /opt, no en un volumen anónimo de
+      # Docker. Carpeta propia del usuario postgres (uid 70 en la imagen alpine).
+      - /opt/orion-chat-db:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chatuser}"]
       interval: 5s
@@ -95,5 +97,4 @@ networks:
     external: true
 
 volumes:
-  postgres-data:
   searxng-cache:
