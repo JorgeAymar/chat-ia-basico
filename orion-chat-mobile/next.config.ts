@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
   // Genera `.next/standalone`: igual que el cliente web, para una imagen
   // Docker liviana que no copia node_modules completo (ver Dockerfile).
   output: "standalone",
+  poweredByHeader: false,
   // Sin esto, Turbopack detecta el package-lock.json de la raíz del repo
   // (el del cliente web) y asume que ESTE proyecto vive en un monorepo con
   // ese directorio como root — con lo cual intenta resolver src/proxy.ts del

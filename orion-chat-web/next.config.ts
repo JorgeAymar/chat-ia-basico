@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // La app vive bajo /app del dominio; la raíz es la landing estática.
   basePath: BASE_PATH,
 
+  // No anunciar el framework en cada respuesta.
+  poweredByHeader: false,
+
   // Genera `.next/standalone`: un servidor Node mínimo con solo los archivos
   // que realmente hacen falta en runtime, sin `node_modules` completo. Es lo
   // que permite que la imagen Docker de producción pese una fracción de lo
