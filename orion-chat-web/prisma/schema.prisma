@@ -34,6 +34,9 @@ model User {
   status     UserStatus @default(INVITED)
   createdAt  DateTime   @default(now())
   acceptedAt DateTime?
+  // "dark" | "light" (ver src/lib/theme.ts). String y no enum para poder
+  // sumar temas sin otra migración de tipo.
+  theme      String     @default("dark")
 
   // Quién lo invitó. onDelete: SetNull porque perder al invitador no debería
   // arrastrar el borrado del invitado; onUpdate: NoAction es obligatorio en

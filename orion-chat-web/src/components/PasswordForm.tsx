@@ -79,7 +79,7 @@ export function PasswordForm({
     <form onSubmit={handleSubmit} className="mt-4">
       <div aria-live="polite">
         {error && (
-          <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+          <p className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">
             {error}
           </p>
         )}
@@ -99,13 +99,13 @@ export function PasswordForm({
         autoComplete="new-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
+        className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)]/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-dim)]/60 focus:border-[var(--accent-bright)]/60 focus:ring-2 focus:ring-[var(--accent-bright)]/30"
       />
       <p className="mt-1 text-xs text-[var(--ink-dim)]">
         Mínimo {MIN_PASSWORD_LENGTH} caracteres
       </p>
       {tooShort && (
-        <p className="mt-1 text-xs text-red-700">
+        <p className="mt-1 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">
           Todavía le faltan caracteres.
         </p>
       )}
@@ -123,10 +123,10 @@ export function PasswordForm({
         autoComplete="new-password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
+        className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)]/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-dim)]/60 focus:border-[var(--accent-bright)]/60 focus:ring-2 focus:ring-[var(--accent-bright)]/30"
       />
       {mismatch && (
-        <p className="mt-1 text-xs text-red-700">Las contraseñas no coinciden.</p>
+        <p className="mt-1 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">Las contraseñas no coinciden.</p>
       )}
 
       <button
@@ -136,7 +136,7 @@ export function PasswordForm({
           password.length < MIN_PASSWORD_LENGTH ||
           password !== confirmPassword
         }
-        className="mt-4 w-full rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+        className="mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] shadow-[var(--shadow-glow)] [background:var(--brand-grad)] transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
       >
         {loading ? loadingLabel : submitLabel}
       </button>

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { consumeLoginToken, peekLoginToken } from "@/lib/auth/tokens";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { syncThemeCookieForUser } from "@/lib/theme-server";
 
 const ERROR_BY_REASON: Record<string, string> = {
   not_found: "Este enlace de invitación no es válido.",
@@ -66,5 +67,6 @@ export async function POST(req: Request) {
   });
 
   await createSession(result.userId);
+  await syncThemeCookieForUser(result.userId);
   return Response.json({ ok: true });
 }

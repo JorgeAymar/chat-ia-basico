@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { Sora, Inter } from "next/font/google";
+import { Sora, Inter, JetBrains_Mono } from "next/font/google";
 // Los estilos de KaTeX vienen del paquete: sin esto las fórmulas se
 // renderizan como una pila de spans sueltos ilegible.
 import "katex/dist/katex.min.css";
 import "./globals.css";
+import { cookies } from "next/headers";
 import { APP_NAME } from "@/lib/app-info";
+import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
 
 // Sora para títulos (geometría condensada y moderna), Inter para el
 // cuerpo —neutra y legible para texto de chat/UI. Compartidas con la app
@@ -20,21 +22,34 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// Monoespaciada para código (bloques e inline), como en el diseño de Stitch.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-code",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
 export const metadata: Metadata = {
   title: APP_NAME,
   description:
     "Chat con modelos de Ollama: streaming, búsqueda web con citas, adjuntos y memoria persistente.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // El tema se resuelve en el servidor (cookie sembrada al loguearse o al
+  // cambiarlo en el perfil): si se aplicara recién en el cliente, cada carga
+  // arrancaría en oscuro y "saltaría" a claro.
+  const theme = resolveTheme((await cookies()).get(THEME_COOKIE)?.value);
+
   return (
     <html
       lang="es"
-      className={`${sora.variable} ${inter.variable} h-full antialiased`}
+      data-theme={theme}
+      className={`${sora.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

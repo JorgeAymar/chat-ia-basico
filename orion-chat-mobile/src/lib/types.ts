@@ -51,10 +51,15 @@ export type UserStatus = "INVITED" | "ACTIVE";
 
 // Sesión actual (GET /api/auth/me). Deliberadamente mínimo: solo lo que la
 // UI necesita para decidir qué mostrar, no el registro completo de User.
+export type Theme = "light" | "dark";
+
 export type CurrentUser = {
   id: string;
   email: string;
   role: UserRole;
+  // Preferencia de apariencia guardada en el perfil. Opcional: un backend
+  // viejo que todavía no la devuelve no debería romper el cliente.
+  theme?: Theme;
 };
 
 // Fila de la tabla de usuarios invitados/activos (GET /api/auth/invite),

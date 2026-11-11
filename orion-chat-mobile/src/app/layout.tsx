@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Sora, Inter } from "next/font/google";
+import { cookies } from "next/headers";
+import { Sora, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { apiUrl } from "@/lib/base-path";
 
@@ -14,6 +15,12 @@ const sora = Sora({
 const inter = Inter({
   variable: "--font-body",
   subsets: ["latin"],
+});
+
+const mono = JetBrains_Mono({
+  variable: "--font-code",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -46,9 +53,18 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+// El tema lo elige el usuario en su perfil y el backend lo deja en la cookie
+// `orion_theme` (path "/", compartida con la web). Leerla acá, en el server,
+// pinta el HTML ya con el tema correcto — sin el parpadeo oscuro→claro que
+// tendría aplicarlo recién desde el cliente.
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const theme = (await cookies()).get("orion_theme")?.value === "light" ? "light" : "dark";
   return (
-    <html lang="es" className={`${sora.variable} ${inter.variable} h-full antialiased`}>
+    <html
+      lang="es"
+      data-theme={theme}
+      className={`${sora.variable} ${inter.variable} ${mono.variable} h-full antialiased`}
+    >
       <body className="min-h-full overscroll-none">{children}</body>
     </html>
   );

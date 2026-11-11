@@ -3,6 +3,7 @@
 // estado del cliente.
 
 import type { Source } from "./stream";
+import type { Theme } from "./theme";
 
 export type Role = "user" | "assistant";
 
@@ -27,6 +28,9 @@ export type Message = {
   sources?: Source[] | null;
   attachments?: Attachment[] | null;
   model?: string | null;
+  // Viene de la base para los mensajes guardados; los optimistas recién
+  // escritos no lo traen todavía.
+  createdAt?: string | null;
 };
 
 export type Conversation = {
@@ -52,6 +56,7 @@ export type CurrentUser = {
   id: string;
   email: string;
   role: UserRole;
+  theme: Theme;
 };
 
 // Fila de la tabla de usuarios invitados/activos (GET /api/auth/invite),

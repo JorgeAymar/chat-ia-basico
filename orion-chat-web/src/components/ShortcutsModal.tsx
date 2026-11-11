@@ -19,7 +19,7 @@ export function ShortcutsModal({ open, onClose, isMac, onTabTrap }: ShortcutsMod
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-md"
       onClick={onClose}
     >
       <div
@@ -29,7 +29,7 @@ export function ShortcutsModal({ open, onClose, isMac, onTabTrap }: ShortcutsMod
         aria-labelledby="shortcuts-title"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => onTabTrap(e, containerRef)}
-        className="msg-enter w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
+        className="msg-enter w-full max-w-md rounded-xl border border-[var(--line)] bg-[var(--panel)]/95 p-5 shadow-xl backdrop-blur-xl"
       >
         <div className="flex items-start gap-3">
           <h2

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { isCloudModel } from "@/lib/model-utils";
+import { isCloudModel, shortModel } from "@/lib/model-utils";
+import { Logo } from "@/components/Logo";
 import { createEventDecoder, type Source } from "@/lib/stream";
 import type { AppUser, Attachment, Conversation, CurrentUser, Memory, Message } from "@/lib/types";
 import { ChatMessage } from "@/components/ChatMessage";
@@ -126,6 +127,10 @@ export default function Home() {
   // gente nueva, esto es por fila de la lista.
   const [resendingUserId, setResendingUserId] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  // Renombrar desde el header (lápiz al lado del título): mismo
+  // handleRename que el doble clic del sidebar.
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -801,6 +806,29 @@ export default function Home() {
   const hasMessages = messages.length > 0;
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
+  const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? "Nueva conversación";
+
+  function startTitleEdit() {
+    if (!activeId) return;
+    setTitleDraft(activeTitle);
+    setTitleEditing(true);
+  }
+
+  function commitTitleEdit() {
+    const title = titleDraft.trim();
+    setTitleEditing(false);
+    if (activeId && title && title !== activeTitle) handleRename(activeId, title);
+  }
+
+  // Un Ollama remoto ya saca los mensajes de la máquina aunque el modelo no
+  // sea "-cloud": no se puede prometer privacidad local solo porque el nombre
+  // del modelo no diga cloud.
+  const privacyNote = ollamaRemote
+    ? "Servidor remoto"
+    : selectedModel && isCloudModel(selectedModel)
+    ? "Modelo en la nube"
+    : "Local";
+
   const composer = (
     <Composer
       input={input}
@@ -814,12 +842,12 @@ export default function Home() {
       onRemoveAttachment={handleRemoveAttachment}
       webSearch={webSearch}
       onToggleWebSearch={() => setWebSearch((v) => !v)}
-      models={models}
-      selectedModel={selectedModel}
-      onSelectModel={handleSelectModel}
       uploading={uploading}
     />
   );
+
+  const iconButton =
+    "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--panel)] text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none";
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-[var(--void)] font-[family-name:var(--font-body)] text-[var(--ink)]">
@@ -857,179 +885,258 @@ export default function Home() {
       {/* tabIndex -1 para que el enlace "saltar al contenido" tenga dónde
           aterrizar: un <main> sin él recibe el hash pero no el foco, y el
           Tab siguiente arrancaría otra vez desde el principio de la página. */}
-      <main id="contenido" tabIndex={-1} className="relative z-10 flex flex-1 flex-col outline-none">
-        <header className="flex items-center gap-3 border-b border-[var(--line)] px-4 py-4 md:px-8">
+      <main id="contenido" tabIndex={-1} className="relative z-10 flex min-w-0 flex-1 flex-col outline-none">
+        {/* Header según el diseño de Google Stitch: título editable a la
+            izquierda; selector de modelo en pill + Exportar a la derecha. */}
+        <header className="z-20 flex h-14 shrink-0 items-center gap-3 border-b border-[var(--line)] bg-[var(--void)]/80 px-3 backdrop-blur-md md:px-6">
           {sidebarCollapsed && (
             <button
               type="button"
               onClick={toggleSidebar}
               aria-label="Mostrar historial de conversaciones"
               title="Mostrar historial de conversaciones"
-              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink)] transition-colors hover:border-[var(--accent)]/40 md:flex focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
+              className={`${iconButton} hidden md:flex`}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <rect x="2" y="2.5" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M6 2.5v11" stroke="currentColor" strokeWidth="1.3" />
               </svg>
             </button>
           )}
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Abrir historial de conversaciones"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink)] transition-colors hover:border-[var(--accent)]/40 md:hidden focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
+            className={`${iconButton} md:hidden`}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
-          <div className="min-w-0">
-            <p className="truncate font-[family-name:var(--font-display)] text-base font-semibold text-[var(--ink)]">
-              {conversations.find((c) => c.id === activeId)?.title ?? "Nueva conversación"}
-            </p>
-            <p className="text-xs text-[var(--ink-dim)]">
-              {/* Un Ollama remoto ya saca los mensajes de la máquina aunque
-                  el modelo no sea "-cloud": no se puede prometer privacidad
-                  local solo porque el nombre del modelo no diga cloud. */}
-              {ollamaRemote
-                ? "Ollama remoto: tus mensajes salen de tu máquina."
-                : selectedModel && isCloudModel(selectedModel)
-                ? "Modelo en la nube: tus mensajes salen de tu máquina."
-                : "Servido por tu Ollama local."}
-              {webSearch ? " Búsqueda web activada." : ""}
-            </p>
-          </div>
-          {hasMessages && (
-            <div className="relative ml-auto" ref={exportMenuRef}>
+
+          <div className="flex min-w-0 items-center gap-3">
+            {titleEditing ? (
+              <input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={commitTitleEdit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitTitleEdit();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setTitleEditing(false);
+                  }
+                }}
+                aria-label="Renombrar conversación"
+                autoFocus
+                className="min-w-0 rounded-lg border border-[var(--accent-bright)]/50 bg-[var(--panel)] px-2.5 py-1 font-[family-name:var(--font-display)] text-[15px] font-semibold text-[var(--ink)] outline-none ring-2 ring-[var(--accent-bright)]/25"
+              />
+            ) : (
               <button
                 type="button"
-                onClick={() => setExportMenuOpen((v) => !v)}
-                aria-label="Exportar conversación"
-                aria-haspopup="menu"
-                aria-expanded={exportMenuOpen}
-                title="Exportar conversación"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+                onClick={startTitleEdit}
+                disabled={!activeId}
+                title={activeId ? "Renombrar" : undefined}
+                className="group flex min-w-0 items-center gap-2 rounded-xl px-2 py-1 transition-colors enabled:hover:bg-[var(--panel)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
               >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M8 2v8m0 0L5 7m3 3l3-3M3 12v1.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V12"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <h1 className="truncate font-[family-name:var(--font-display)] text-[15px] font-semibold tracking-tight text-[var(--ink)]">
+                  {activeTitle}
+                </h1>
+                {activeId && (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    aria-hidden="true"
+                    className="shrink-0 text-[var(--ink-dim)] transition-colors group-hover:text-[var(--accent-bright)]"
+                  >
+                    <path
+                      d="M10.5 2.5l3 3L6 13H3v-3l7.5-7.5z"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
               </button>
-              {exportMenuOpen && (
-                <div
-                  role="menu"
-                  className="msg-enter absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--panel)] py-1 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.25)]"
-                >
-                  {(Object.entries(EXPORT_FORMAT_LABELS) as [ExportFormat, string][]).map(
-                    ([format, label]) => (
-                      <button
-                        key={format}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handleExport(format)}
-                        className="block w-full px-3 py-2 text-left text-sm text-[var(--ink)] transition-colors hover:bg-[var(--panel-2)] focus-visible:bg-[var(--panel-2)] focus-visible:outline-none"
-                      >
-                        {label}
-                      </button>
-                    )
-                  )}
-                </div>
+            )}
+            <span className="hidden text-[var(--line)] sm:inline">|</span>
+            <span className="hidden truncate text-[12px] text-[var(--ink-dim)] sm:inline">
+              {privacyNote}
+              {webSearch ? " · Búsqueda web" : ""}
+            </span>
+          </div>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* Selector de modelo en pill: un <select> nativo transparente
+                encima de la píldora, así se conserva el teclado y el
+                lector de pantalla del control nativo con el look del diseño. */}
+            <div className="relative flex h-8 items-center gap-2 rounded-xl border border-[var(--accent-bright)]/25 bg-[var(--panel)] pl-3 pr-2 shadow-sm transition-colors hover:border-[var(--accent-bright)]/50 hover:bg-[var(--panel-2)] focus-within:ring-2 focus-within:ring-[var(--accent-bright)]">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--accent-bright)] shadow-[var(--shadow-glow)]" />
+              <span className="max-w-[9rem] truncate font-mono text-[12px] font-medium text-[var(--ink)] sm:max-w-[14rem]">
+                {selectedModel ? shortModel(selectedModel) : "Sin modelos"}
+              </span>
+              {selectedModel && isCloudModel(selectedModel) && (
+                <span className="hidden rounded bg-[var(--accent-bright)]/20 px-1.5 text-[9px] font-bold uppercase tracking-wide text-[var(--accent-bright)] sm:inline">
+                  Cloud
+                </span>
               )}
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className="text-[var(--ink-dim)]">
+                <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              <select
+                value={selectedModel}
+                onChange={(e) => handleSelectModel(e.target.value)}
+                aria-label="Modelo"
+                disabled={models.length === 0}
+                className="absolute inset-0 cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+              >
+                {models.length === 0 && <option>Sin modelos disponibles</option>}
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {shortModel(m)}
+                    {isCloudModel(m) ? " (cloud)" : ""}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+
+            {hasMessages && (
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setExportMenuOpen((v) => !v)}
+                  aria-label="Exportar conversación"
+                  aria-haspopup="menu"
+                  aria-expanded={exportMenuOpen}
+                  title="Exportar conversación"
+                  className="flex h-8 items-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-2.5 text-[13px] font-medium text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+                >
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path
+                      d="M8 10V2m0 0L5 5m3-3l3 3M3 9v4.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V9"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
+                {exportMenuOpen && (
+                  <div
+                    role="menu"
+                    className="msg-enter absolute right-0 top-full z-30 mt-1.5 w-48 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--panel)]/95 p-1 shadow-xl backdrop-blur-xl"
+                  >
+                    {(Object.entries(EXPORT_FORMAT_LABELS) as [ExportFormat, string][]).map(
+                      ([format, label]) => (
+                        <button
+                          key={format}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => handleExport(format)}
+                          className="block w-full rounded-lg px-3 py-2 text-left text-[13px] text-[var(--ink)] transition-colors hover:bg-[var(--panel-2)] focus-visible:bg-[var(--panel-2)] focus-visible:outline-none"
+                        >
+                          {label}
+                        </button>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </header>
 
         {!hasMessages && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto px-8 py-8">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <p className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[var(--ink)]">
+          <div className="flex flex-1 flex-col items-center justify-center gap-8 overflow-y-auto px-6 pb-48 pt-8">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="rounded-2xl [background:var(--brand-grad)] p-[1px] shadow-[var(--shadow-glow)]">
+                <Logo className="h-12 w-12 rounded-2xl" />
+              </div>
+              <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-[var(--ink)]">
                 ¿En qué estás pensando?
-              </p>
-              <p className="max-w-sm text-sm text-[var(--ink-dim)]">
+              </h2>
+              <p className="max-w-md text-[14px] leading-relaxed text-[var(--ink-dim)]">
                 Escribí lo que quieras, adjuntá un PDF o activá la búsqueda web para
                 que la respuesta venga con fuentes.
               </p>
             </div>
 
-            <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid w-full max-w-[760px] grid-cols-1 gap-3 sm:grid-cols-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
                   onClick={() => setInput(suggestion)}
                   disabled={!ready}
-                  className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2.5 text-left text-[13px] text-[var(--ink-dim)] transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+                  className="group flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-4 py-3.5 text-left text-[13px] leading-relaxed text-[var(--ink-dim)] transition-all hover:-translate-y-0.5 hover:border-[var(--accent-bright)]/40 hover:bg-[var(--panel-2)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
                 >
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--accent-dim)] text-[var(--accent-bright)]">
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="M2 6h8M6.5 2.5L10 6l-3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
                   {suggestion}
                 </button>
               ))}
             </div>
-
-            {composer}
-            {error && (
-              <div className="w-full max-w-2xl rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-700">
-                <span className="mr-1 text-red-500">⚠</span>
-                {error}
-              </div>
-            )}
           </div>
         )}
 
         {hasMessages && (
-          <>
-            <div className="flex-1 overflow-y-auto px-4 py-8 md:px-8">
-              {/* role="log" + aria-live="polite": el lector de pantalla lee lo
-                  que se va agregando cuando termina lo que estaba diciendo, en
-                  vez de interrumpir a cada token como haría "assertive". */}
-              <div
-                role="log"
-                aria-live="polite"
-                aria-relevant="additions text"
-                aria-label="Mensajes de la conversación"
-                className="mx-auto flex max-w-2xl flex-col gap-5"
-              >
-                {messages.map((message) => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                    isStreaming={isStreaming && message.id === lastAssistantId}
-                    canAct={!isStreaming}
-                    onRegenerate={() => handleRegenerate(message.id)}
-                    onEdit={(newText) => handleEdit(message.id, newText)}
-                  />
-                ))}
-                <div ref={bottomRef} />
-              </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-52 pt-8 md:px-6">
+            {/* role="log" + aria-live="polite": el lector de pantalla lee lo
+                que se va agregando cuando termina lo que estaba diciendo, en
+                vez de interrumpir a cada token como haría "assertive". */}
+            <div
+              role="log"
+              aria-live="polite"
+              aria-relevant="additions text"
+              aria-label="Mensajes de la conversación"
+              className="mx-auto flex max-w-[760px] flex-col gap-8"
+            >
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  isStreaming={isStreaming && message.id === lastAssistantId}
+                  canAct={!isStreaming}
+                  onRegenerate={() => handleRegenerate(message.id)}
+                  onEdit={(newText) => handleEdit(message.id, newText)}
+                />
+              ))}
+              <div ref={bottomRef} />
             </div>
-
-            {status && (
-              <div className="mx-4 mb-2 md:mx-8">
-                <p className="mx-auto max-w-2xl text-xs text-[var(--ink-dim)]">
-                  <span className="shimmer-text">{status}</span>
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="mx-4 mb-3 md:mx-8">
-                <div className="mx-auto flex max-w-2xl items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-700">
-                  <span className="mt-0.5 text-red-500">⚠</span>
-                  {error}
-                </div>
-              </div>
-            )}
-
-            <div className="px-4 pb-8 pt-2 md:px-8">{composer}</div>
-          </>
+          </div>
         )}
+
+        {/* Composer flotante (diseño Stitch): fijo abajo, con un degradé
+            desde el fondo para que los mensajes se desvanezcan detrás. El
+            estado y los errores viajan con él para que siempre se vean. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-[var(--void)] via-[var(--void)]/90 to-transparent px-4 pb-5 pt-12 md:px-6">
+          <div className="pointer-events-auto mx-auto w-full max-w-[760px]">
+            {status && (
+              <p className="mb-2 px-1 text-xs text-[var(--ink-dim)]">
+                <span className="shimmer-text">{status}</span>
+              </p>
+            )}
+            {error && (
+              <div className="mb-2 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))] backdrop-blur">
+                <span className="mt-0.5 text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">⚠</span>
+                {error}
+              </div>
+            )}
+            {composer}
+          </div>
+        </div>
       </main>
 
       {confirmDeleteId && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-md"
           onClick={closeDeleteModal}
         >
           <div
@@ -1039,7 +1146,7 @@ export default function Home() {
             aria-labelledby="confirm-delete-title"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => handleModalTabTrap(e, deleteModalRef)}
-            className="msg-enter w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
+            className="msg-enter w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--panel)]/95 p-5 shadow-xl backdrop-blur-xl"
           >
             <p
               id="confirm-delete-title"
@@ -1055,7 +1162,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={closeDeleteModal}
-                className="rounded-full border border-[var(--line)] px-4 py-2 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--panel-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
+                className="rounded-xl border border-[var(--line)] px-4 py-2 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--panel-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
               >
                 Cancelar
               </button>
@@ -1063,7 +1170,7 @@ export default function Home() {
                 type="button"
                 onClick={handleConfirmDelete}
                 autoFocus
-                className="rounded-full bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
+                className="rounded-xl bg-red-500/90 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--void)]"
               >
                 Borrar
               </button>
@@ -1098,6 +1205,7 @@ export default function Home() {
         inviteSuccessMessage={inviteSuccessMessage}
         resendingUserId={resendingUserId}
         onResendInvite={handleResendInvite}
+        userEmail={currentUser?.email ?? null}
       />
 
       <ShortcutsModal

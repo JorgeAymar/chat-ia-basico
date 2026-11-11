@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { APP_NAME } from "@/lib/app-info";
+import { Logo } from "@/components/Logo";
 
 const GENERIC_REDIRECT_ERROR = "El enlace no es válido o venció.";
 
@@ -53,9 +54,13 @@ function LoginPageContent() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--void)] px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.15)]">
-        <h1 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--ink)]">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--void)] px-4">
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/3 h-[440px] w-[640px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,var(--accent-dim),transparent_65%)]" />
+      <div className="relative w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--panel)]/90 p-7 shadow-xl backdrop-blur-xl">
+        <div className="w-fit rounded-xl [background:var(--brand-grad)] p-[1px] shadow-[var(--shadow-glow)]">
+          <Logo className="h-10 w-10 rounded-xl" />
+        </div>
+        <h1 className="mt-5 font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--ink)]">
           {APP_NAME}
         </h1>
         <p className="mt-1 text-sm text-[var(--ink-dim)]">
@@ -64,12 +69,12 @@ function LoginPageContent() {
 
         <div aria-live="polite" className="mt-4 flex flex-col gap-2 empty:mt-0">
           {hasRedirectError && !formError && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+            <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">
               {GENERIC_REDIRECT_ERROR}
             </p>
           )}
           {formError && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+            <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">
               {formError}
             </p>
           )}
@@ -91,7 +96,7 @@ function LoginPageContent() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tu@empresa.com"
-            className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
+            className="mt-2 w-full rounded-xl border border-[var(--line)] bg-[var(--void)]/70 px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-dim)]/60 focus:border-[var(--accent-bright)]/60 focus:ring-2 focus:ring-[var(--accent-bright)]/30"
           />
 
           <label
@@ -108,7 +113,7 @@ function LoginPageContent() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3 py-2 pr-10 text-sm text-[var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)]"
+              className="w-full rounded-xl border border-[var(--line)] bg-[var(--void)]/70 px-3.5 py-2.5 pr-10 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-dim)]/60 focus:border-[var(--accent-bright)]/60 focus:ring-2 focus:ring-[var(--accent-bright)]/30"
             />
             <button
               type="button"
@@ -134,7 +139,7 @@ function LoginPageContent() {
           <button
             type="submit"
             disabled={loading || !email.trim() || !password}
-            className="mt-4 w-full rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+            className="mt-4 w-full rounded-xl [background:var(--brand-grad)] px-4 py-2.5 text-sm font-semibold text-[var(--on-accent)] shadow-[var(--shadow-glow)] transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
           >
             {loading ? "Ingresando…" : "Ingresar"}
           </button>

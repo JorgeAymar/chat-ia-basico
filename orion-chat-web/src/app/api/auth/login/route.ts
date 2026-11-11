@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { syncThemeCookieForUser } from "@/lib/theme-server";
 import { isValidEmail } from "@/lib/auth/validate";
 
 // Mismo mensaje exista o no la cuenta, o esté bien o mal la contraseña:
@@ -39,5 +40,6 @@ export async function POST(req: Request) {
   }
 
   await createSession(user!.id);
+  await syncThemeCookieForUser(user!.id);
   return Response.json({ ok: true });
 }

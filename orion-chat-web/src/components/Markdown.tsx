@@ -28,7 +28,21 @@ function extractText(node: ReactNode): string {
   return "";
 }
 
-function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }) {
+function CopyButton({
+  text,
+  label = "Copiar",
+  display = "Copiar",
+  tone = "default",
+}: {
+  text: string;
+  // "code": sobre la barra del bloque de código, que es oscura en los dos
+  // temas — ahí los colores salen de --code-ink, no de --ink.
+  tone?: "default" | "code";
+  // Lo que lee un lector de pantalla (más específico: "Copiar código").
+  label?: string;
+  // Lo que se ve: corto, como en el diseño de Stitch.
+  display?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -47,9 +61,24 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
       type="button"
       onClick={handleCopy}
       aria-label={copied ? "Copiado" : label}
-      className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+      title={label}
+      className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none ${
+        tone === "code"
+          ? "border border-[var(--code-ink)]/15 bg-[var(--code-ink)]/5 text-[var(--code-ink)]/75 hover:bg-[var(--code-ink)]/10 hover:text-[var(--code-ink)]"
+          : "text-[var(--ink-dim)] hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
+      }`}
     >
-      {copied ? "✓ Copiado" : label}
+      {copied ? (
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="shrink-0 text-[var(--accent-bright)]" aria-hidden="true">
+          <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="shrink-0" aria-hidden="true">
+          <rect x="5" y="5" width="8.5" height="8.5" rx="1.8" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M3 10.5V3.8A1.3 1.3 0 014.3 2.5H11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      )}
+      <span>{copied ? "Copiado" : display}</span>
     </button>
   );
 }
@@ -99,9 +128,9 @@ function DownloadButton({ text, filename }: { text: string; filename: string }) 
       onClick={() => downloadText(text, filename, "text/plain")}
       aria-label={`Descargar ${filename}`}
       title={`Descargar como ${filename}`}
-      className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel-2)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+      className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-[var(--code-ink)]/75 transition-colors hover:bg-[var(--code-ink)]/10 hover:text-[var(--code-ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
     >
-      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="shrink-0" aria-hidden="true">
         <path
           d="M8 2v8m0 0L5 7m3 3l3-3M3 12v1.5A1.5 1.5 0 004.5 15h7a1.5 1.5 0 001.5-1.5V12"
           stroke="currentColor"
@@ -133,22 +162,25 @@ function CodeBlock({ children }: { children: ReactNode }) {
   );
 
   return (
-    // Fondo oscuro deliberado, distinto del resto de la burbuja: en el
-    // sistema de diseño corporativo el código es la única superficie que se
-    // permite contrastar fuerte, como en un editor. La cabecera se queda
-    // clara para que el nombre del lenguaje y "Copiar"/"Descargar" no
-    // compitan con la sintaxis coloreada de abajo.
-    <div className="group/code my-3 overflow-hidden rounded-lg border border-[var(--line)]">
-      <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--void-2)] px-3 py-1">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--ink-dim)]">
-          {language || "texto"}
+    // Cromo tipo editor del diseño de Stitch: barra superior con los tres
+    // puntos de ventana, el lenguaje en mayúsculas y las acciones a la
+    // derecha; el cuerpo en el fondo más oscuro de la paleta, monoespaciado.
+    <div className="group/code my-4 overflow-hidden rounded-xl border border-[var(--code-ink)]/10 bg-[var(--code-bg)] shadow-md">
+      <div className="flex items-center justify-between border-b border-[var(--code-ink)]/10 bg-[var(--code-bar)] px-4 py-1.5">
+        <span className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" aria-hidden="true" />
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" aria-hidden="true" />
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" aria-hidden="true" />
+          <span className="ml-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-[var(--code-ink)]/75">
+            {language || "texto"}
+          </span>
         </span>
         <span className="flex items-center gap-0.5">
           <DownloadButton text={code} filename={filename} />
-          <CopyButton text={code} label="Copiar código" />
+          <CopyButton text={code} label="Copiar código" display="Copiar código" tone="code" />
         </span>
       </div>
-      <pre className="overflow-x-auto bg-[#1e1e1e] p-3 text-[12.5px] leading-relaxed">{children}</pre>
+      <pre className="overflow-x-auto p-4 font-mono text-[13px] leading-[1.6] text-[var(--code-ink)]">{children}</pre>
     </div>
   );
 }
@@ -184,7 +216,7 @@ const markdownComponents = {
     }
     return (
       <code
-        className="rounded bg-[var(--panel-2)] px-1 py-0.5 font-mono text-[0.9em] text-[var(--accent)]"
+        className="rounded-md border border-[var(--accent-bright)]/25 bg-[var(--accent-dim)] px-1.5 py-0.5 font-mono text-[0.88em] font-medium text-[var(--accent-bright)]"
         {...props}
       >
         {children}
@@ -197,7 +229,7 @@ const markdownComponents = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[var(--accent)] underline decoration-[var(--accent)]/30 underline-offset-2 hover:decoration-[var(--accent)]"
+        className="text-[var(--accent-bright)] underline decoration-[var(--accent-bright)]/30 underline-offset-2 transition-colors hover:decoration-[var(--accent-bright)]"
         {...props}
       >
         {children}
@@ -208,20 +240,20 @@ const markdownComponents = {
     // Las tablas anchas scrollean adentro de su propio contenedor: si no,
     // desbordan la burbuja y estiran el layout entero.
     return (
-      <div className="my-3 overflow-x-auto rounded-lg border border-[var(--line)]">
-        <table className="w-full border-collapse text-[12.5px]">{children}</table>
+      <div className="my-4 overflow-x-auto rounded-xl border border-[var(--line)]">
+        <table className="w-full border-collapse text-[13px]">{children}</table>
       </div>
     );
   },
   th({ children }: { children?: ReactNode }) {
     return (
-      <th className="border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-1.5 text-left font-semibold">
+      <th className="border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-[var(--ink-dim)]">
         {children}
       </th>
     );
   },
   td({ children }: { children?: ReactNode }) {
-    return <td className="border-b border-[var(--line)] px-3 py-1.5 align-top">{children}</td>;
+    return <td className="border-b border-[var(--line)] px-3 py-2 align-top">{children}</td>;
   },
 };
 

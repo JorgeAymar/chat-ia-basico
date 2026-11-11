@@ -1,21 +1,61 @@
 @import "tailwindcss";
 
-/* Mismos tokens que orion-chat-web/src/app/globals.css y la landing —
-   paleta "violeta eléctrico": fondo casi negro #0a0a0f, índigo #6366f1
-   para rellenos y violeta #8b5cf6 reservado para CTAs/foco/indicadores
-   activos, nunca como fondo grande. */
-:root {
-  --ink: #f4f4f8;
-  --ink-dim: #9696ab;
+/* Mismo contrato de tokens que orion-chat-web/src/app/globals.css. Dos
+   temas, elegidos desde el perfil (cookie `orion_theme`, ver layout.tsx):
+   oscuro = pantalla "Orion Chat - Mobile (Linear Theme)" de Stitch; claro =
+   "Ollama Local Chat - Mobile" (blanco + naranja). Los componentes solo usan
+   estas variables, nunca colores fijos, para que el cambio sea instantáneo. */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
   --void: #0a0a0f;
   --void-2: #0f0f16;
   --panel: #13131a;
   --panel-2: #1b1b25;
   --line: #26263a;
+  --ink: #f4f4f8;
+  --ink-dim: #9696ab;
   --accent: #6366f1;
   --accent-bright: #8b5cf6;
   --accent-dim: rgba(139, 92, 246, 0.14);
+  --on-accent: #fff;
+  --brand-grad: linear-gradient(135deg, #7c3aed, #4f46e5);
+  --user-bubble-bg: linear-gradient(90deg, #7c3aed, #4f46e5);
+  --user-bubble-border: rgba(255, 255, 255, 0.1);
+  --user-bubble-text: #fff;
+  --assistant-bg: transparent;
+  --assistant-border: transparent;
+  --code-bg: #0a0a0f;
+  --code-bar: #13131a;
+  --code-ink: #e2e8f0;
   --shadow-glow: 0 0 28px rgba(139, 92, 246, 0.4);
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --void: #f8fafc;
+  --void-2: #f1f5f9;
+  --panel: #fff;
+  --panel-2: #f1f5f9;
+  --line: #e2e8f0;
+  --ink: #0f172a;
+  --ink-dim: #64748b;
+  --accent: #c2410c;
+  --accent-bright: #ea580c;
+  --accent-dim: #fff7ed;
+  --on-accent: #fff;
+  --brand-grad: linear-gradient(135deg, #ea580c, #ea580c);
+  --user-bubble-bg: #fff7ed;
+  --user-bubble-border: #fed7aa;
+  --user-bubble-text: #0f172a;
+  --assistant-bg: #fff;
+  --assistant-border: #e2e8f0;
+  --code-bg: #0d1117;
+  --code-bar: #161b22;
+  --code-ink: #e2e8f0;
+  --shadow-glow: 0 0 12px -1px rgba(234, 88, 12, 0.4);
+  --overlay: rgba(15, 23, 42, 0.4);
 }
 
 @theme inline {
@@ -38,10 +78,6 @@
   border-color: var(--line);
 }
 
-html {
-  color-scheme: dark;
-}
-
 body {
   background: var(--void);
   color: var(--ink);
@@ -55,16 +91,16 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(243, 244, 236, 0.18) transparent;
+  scrollbar-color: var(--line) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(243, 244, 236, 0.14);
+  background: var(--line);
   border-radius: 999px;
 }
 
@@ -145,3 +181,25 @@ body {
   border: 0;
   border-top: 1px solid var(--line);
 }
+/* La respuesta del asistente: sin caja en oscuro (Stitch dark), tarjeta
+   blanca con padding en claro (Stitch light). */
+[data-theme="light"] .assistant-card { padding: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+.markdown-body strong { font-weight: 600; }
+.markdown-body a { color: var(--accent-bright); text-decoration: underline; text-underline-offset: 2px; }
+/* Código inline (no el de bloques, que se arma en CodeBlock de page.tsx). */
+.markdown-body :not(pre) > code {
+  font-family: var(--font-code), ui-monospace, monospace;
+  font-size: 0.86em;
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--accent-bright);
+}
+.markdown-body pre {
+  margin: 0;
+  font-family: var(--font-code), ui-monospace, monospace;
+}
+.markdown-body table { width: 100%; border-collapse: collapse; font-size: 0.9em; margin: 0.6em 0; }
+.markdown-body th,
+.markdown-body td { border: 1px solid var(--line); padding: 0.35em 0.6em; text-align: left; }

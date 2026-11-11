@@ -26,55 +26,53 @@ export function Sources({ sources }: { sources: Source[] }) {
   const hidden = sources.length - visible.length;
 
   return (
-    <div className="mt-3 border-t border-[var(--line)] pt-2.5">
-      <p className="mb-1.5 font-[family-name:var(--font-label)] text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--ink-dim)]/70">
-        Fuentes ({sources.length})
+    <div className="pt-1">
+      <p className="mb-2 font-[family-name:var(--font-label)] text-[11px] font-semibold uppercase tracking-wider text-[var(--ink-dim)]">
+        Fuentes consultadas
       </p>
-      <ol className="flex flex-col gap-1">
-        {visible.map((source, index) => (
-          // La clave es el índice porque el número visible ES el índice+1: es
-          // el marcador [n] que el modelo escribió en el texto, así que el
-          // orden del array no puede cambiar sin romper las citas.
-          <li key={index}>
-            <a
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-[var(--panel-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-            >
-              <span className="mt-px shrink-0 font-mono text-[10px] text-[var(--accent)]">
-                [{index + 1}]
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline gap-2">
-                  <span className="truncate text-[12px] font-medium text-[var(--ink)]">
-                    {source.title}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-[var(--ink-dim)]">
-                    {domainOf(source.url)}
-                  </span>
+      <ol className="flex flex-wrap items-center gap-2">
+        {visible.map((source, index) => {
+          const domain = domainOf(source.url);
+          return (
+            // La clave es el índice porque el número visible ES el índice+1: es
+            // el marcador [n] que el modelo escribió en el texto, así que el
+            // orden del array no puede cambiar sin romper las citas.
+            <li key={index} className="min-w-0 max-w-full">
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={source.snippet ? `${source.title}\n\n${source.snippet}` : source.title}
+                className="group/src inline-flex max-w-full items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-2.5 py-1.5 text-[12px] text-[var(--ink)] transition-colors hover:border-[var(--accent-bright)]/40 hover:bg-[var(--panel-2)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+              >
+                <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded bg-[var(--accent-dim)] px-1 font-mono text-[9.5px] font-bold text-[var(--accent-bright)]">
+                  {index + 1}
                 </span>
-                {source.snippet && (
-                  <span className="mt-0.5 line-clamp-2 block text-[11.5px] leading-snug text-[var(--ink-dim)]">
-                    {source.snippet}
-                  </span>
-                )}
-              </span>
-            </a>
+                <span className="shrink-0 font-medium">{domain}</span>
+                <span className="min-w-0 max-w-[220px] truncate text-[11px] text-[var(--ink-dim)]">
+                  {source.title}
+                </span>
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0 text-[var(--ink-dim)] transition-colors group-hover/src:text-[var(--accent-bright)]">
+                  <path d="M9 3h4v4M13 3L7.5 8.5M11.5 9.5V12a1 1 0 01-1 1H4a1 1 0 01-1-1V5.5a1 1 0 011-1h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </li>
+          );
+        })}
+        {collapsible && (
+          <li>
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
+              aria-label={expanded ? "Mostrar menos fuentes" : `Mostrar ${hidden} fuentes más`}
+              className="rounded-xl px-2.5 py-1.5 text-[12px] text-[var(--ink-dim)] transition-colors hover:bg-[var(--panel)] hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+            >
+              {expanded ? "Mostrar menos" : `+${hidden} más`}
+            </button>
           </li>
-        ))}
+        )}
       </ol>
-      {collapsible && (
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-          aria-label={expanded ? "Mostrar menos fuentes" : `Mostrar ${hidden} fuentes más`}
-          className="mt-1 rounded-md px-2 py-1 text-[11px] text-[var(--ink-dim)] transition-colors hover:text-[var(--ink)] focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
-        >
-          {expanded ? "Mostrar menos" : `Mostrar ${hidden} más`}
-        </button>
-      )}
     </div>
   );
 }

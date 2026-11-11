@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { APP_NAME } from "@/lib/app-info";
+import { Logo } from "@/components/Logo";
 import { PasswordForm } from "@/components/PasswordForm";
 
 function AcceptInvitePageContent() {
@@ -41,15 +42,19 @@ function AcceptInvitePageContent() {
   }, [token]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--void)] px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.15)]">
-        <h1 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--ink)]">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--void)] px-4">
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/3 h-[440px] w-[640px] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,var(--accent-dim),transparent_65%)]" />
+      <div className="relative w-full max-w-sm rounded-xl border border-[var(--line)] bg-[var(--panel)]/90 p-7 shadow-xl backdrop-blur-xl">
+        <div className="w-fit rounded-xl [background:var(--brand-grad)] p-[1px] shadow-[var(--shadow-glow)]">
+          <Logo className="h-10 w-10 rounded-xl" />
+        </div>
+        <h1 className="mt-5 font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[var(--ink)]">
           {APP_NAME}
         </h1>
 
         {!token ? (
           <div aria-live="polite" className="mt-4">
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+            <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">
               Este enlace no es válido: falta el token.
             </p>
           </div>
@@ -57,7 +62,7 @@ function AcceptInvitePageContent() {
           <p className="mt-2 text-sm text-[var(--ink-dim)]">Comprobando el enlace…</p>
         ) : email === false ? (
           <div aria-live="polite" className="mt-4">
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+            <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-[color-mix(in_srgb,#ef4444_70%,var(--ink))]">
               {checkError}
             </p>
           </div>

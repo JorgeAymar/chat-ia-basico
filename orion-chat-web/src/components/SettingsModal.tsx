@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Memory } from "@/lib/types";
+import { isTheme, type Theme } from "@/lib/theme";
 
 const FOCUSABLE = 'button, input, textarea, select, [tabindex]:not([tabindex="-1"])';
 
@@ -38,7 +39,94 @@ type SettingsModalProps = {
   inviteSuccessMessage: string | null;
   resendingUserId: string | null;
   onResendInvite: (id: string, email: string) => void;
+  userEmail?: string | null;
 };
+
+const THEME_OPTIONS: { value: Theme; label: string }[] = [
+  { value: "dark", label: "Oscuro" },
+  { value: "light", label: "Claro" },
+];
+
+function ThemeIcon({ theme }: { theme: Theme }) {
+  return theme === "dark" ? (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M13.5 9.5A5.5 5.5 0 016.5 2.5a5.5 5.5 0 107 7z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Selector de tema del perfil: aplica al instante sobre <html data-theme>
+// y lo persiste en /api/profile (base + cookie para el render del servidor).
+// Si falla, vuelve al tema anterior para no mostrar uno que no quedó guardado.
+function AppearancePicker() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof document === "undefined") return "dark";
+    const current = document.documentElement.dataset.theme;
+    return isTheme(current) ? current : "dark";
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function choose(next: Theme) {
+    if (next === theme || saving) return;
+    const previous = theme;
+    setTheme(next);
+    setError(null);
+    document.documentElement.dataset.theme = next;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTheme(previous);
+      document.documentElement.dataset.theme = previous;
+      setError("No se pudo guardar el tema. Probá de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div
+        role="radiogroup"
+        aria-label="Apariencia"
+        className="mt-2 inline-flex rounded-xl border border-[var(--line)] bg-[var(--void)] p-1"
+      >
+        {THEME_OPTIONS.map((opt) => {
+          const active = theme === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => choose(opt.value)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none ${
+                active
+                  ? "bg-[var(--accent-bright)] text-[var(--on-accent)] shadow-[var(--shadow-glow)]"
+                  : "text-[var(--ink-dim)] hover:text-[var(--ink)]"
+              }`}
+            >
+              <ThemeIcon theme={opt.value} />
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
 
 export function SettingsModal({
   open,
@@ -66,6 +154,7 @@ export function SettingsModal({
   inviteSuccessMessage,
   resendingUserId,
   onResendInvite,
+  userEmail,
 }: SettingsModalProps): React.JSX.Element | null {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +199,7 @@ export function SettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-md p-4"
       onClick={onClose}
     >
       <div
@@ -121,7 +210,7 @@ export function SettingsModal({
         // El clic dentro del panel no debe burbujear al fondo, que cierra.
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleModalTabTrap}
-        className="msg-enter flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)]"
+        className="msg-enter flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl border border-[var(--line)] bg-[var(--panel)]/95 p-5 shadow-[var(--shadow-glow)] backdrop-blur-xl"
       >
         <div className="flex items-center justify-between">
           <p
@@ -144,6 +233,15 @@ export function SettingsModal({
           <p className="py-8 text-center text-sm text-[var(--ink-dim)]">Cargando…</p>
         ) : (
           <div className="mt-4 flex-1 overflow-y-auto pr-1">
+            <section className="mb-6 border-b border-[var(--line)] pb-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[var(--ink-dim)]">
+                Perfil
+              </p>
+              {userEmail && <p className="mt-1 truncate text-sm text-[var(--ink)]">{userEmail}</p>}
+              <p className="mt-3 text-xs font-medium text-[var(--ink-dim)]">Apariencia</p>
+              <AppearancePicker />
+            </section>
+
             <section>
               <label
                 htmlFor="system-prompt"
@@ -169,7 +267,7 @@ export function SettingsModal({
                   type="button"
                   onClick={onSaveSystemPrompt}
                   disabled={saving || systemPromptDraft === systemPrompt}
-                  className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-bright)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
+                  className="rounded-lg bg-[image:var(--brand-grad)] px-4 py-1.5 text-sm font-semibold text-[var(--on-accent)] shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[var(--accent-bright)] focus-visible:outline-none"
                 >
                   {saving ? "Guardando…" : "Guardar"}
                 </button>
@@ -270,7 +368,7 @@ export function SettingsModal({
                     antes de cada intento nuevo, así que acá no hace falta
                     decidir prioridad. */}
                 {inviteError && (
-                  <p className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+                  <p className="mt-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
                     {inviteError}
                   </p>
                 )}
@@ -331,7 +429,7 @@ export function SettingsModal({
             )}
 
             {error && (
-              <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700">
+              <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
                 {error}
               </p>
             )}
