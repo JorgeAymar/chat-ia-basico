@@ -211,7 +211,7 @@ function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }
           // que mostrar más allá de no marcar "Copiado".
         }
       }}
-      className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-[var(--ink-dim)] transition hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
+      className="flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-1 text-[12px] text-[var(--ink-dim)] transition hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
     >
       <Icon d={I.copy} size={14} />
       {copied ? "Copiado" : label}
@@ -333,7 +333,7 @@ function SourceChips({ sources }: { sources: Source[] }) {
             href={s.url}
             target="_blank"
             rel="noreferrer"
-            className="flex max-w-full items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-2.5 py-1.5 text-[12px] text-[var(--ink)]"
+            className="flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-3 py-1.5 text-[12px] text-[var(--ink)]"
           >
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[var(--accent-dim)] font-[family-name:var(--font-code)] text-[9px] font-bold text-[var(--accent-bright)]">
               {i + 1}
@@ -389,7 +389,7 @@ function MessageView({
       {(message.thinking || (live && empty)) && <ThinkingPill message={message} live={live} />}
 
       {message.content && (
-        <div className="markdown-body text-[15px] leading-relaxed text-[var(--ink)]">
+        <div className="markdown-body text-[15px] leading-relaxed text-[var(--ink)] [overflow-wrap:anywhere]">
           <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={markdownComponents}>
             {message.content}
           </ReactMarkdown>
@@ -405,7 +405,7 @@ function MessageView({
             <button
               type="button"
               onClick={onRegenerate}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-[var(--ink-dim)] transition hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
+              className="flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-1 text-[12px] text-[var(--ink-dim)] transition hover:bg-[var(--panel-2)] hover:text-[var(--ink)]"
             >
               <Icon d={I.refresh} size={14} />
               Regenerar
@@ -741,7 +741,7 @@ export default function Home() {
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Abrir historial"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--ink)] active:bg-[var(--panel-2)]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--ink)] active:bg-[var(--panel-2)]"
         >
           <Icon d={I.menu} size={20} />
         </button>
@@ -755,7 +755,7 @@ export default function Home() {
             disabled={!ready}
             aria-haspopup="listbox"
             aria-expanded={modelMenuOpen}
-            className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--panel)] px-2.5 py-1.5 disabled:opacity-50"
+            className="flex min-h-11 max-w-[160px] items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--panel)] px-3 py-1.5 disabled:opacity-50"
           >
             <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--accent-bright)] shadow-[var(--shadow-glow)]" />
             <span className="truncate font-[family-name:var(--font-code)] text-[12px] text-[var(--ink)]">
@@ -791,7 +791,7 @@ export default function Home() {
       </header>
 
       {/* Conversación */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-4">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
             <LogoTile size={52} />
@@ -842,14 +842,14 @@ export default function Home() {
             placeholder={ready ? "Escribe un mensaje o pregunta a Orion..." : "Conectando con el servidor…"}
             disabled={!ready}
             rows={1}
-            className="block max-h-40 min-h-[2.75rem] w-full resize-none bg-transparent px-1.5 py-1.5 text-base leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] disabled:opacity-50"
+            className="block max-h-[min(10rem,30dvh)] min-h-[2.75rem] w-full resize-none bg-transparent px-1.5 py-1.5 text-base leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] disabled:opacity-50"
           />
           <div className="mt-1 flex items-center gap-2 border-t border-[var(--line)] pt-2">
             <button
               type="button"
               onClick={() => setWebSearch((v) => !v)}
               aria-pressed={webSearch}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition ${
+              className={`flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition ${
                 webSearch
                   ? "border-[var(--accent-bright)] bg-[var(--accent-dim)] text-[var(--accent-bright)]"
                   : "border-[var(--line)] text-[var(--ink-dim)]"
@@ -864,7 +864,7 @@ export default function Home() {
                 type="button"
                 onClick={() => abortRef.current?.abort()}
                 aria-label="Detener"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-2)] text-[var(--ink)]"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--panel-2)] text-[var(--ink)]"
               >
                 <Icon d={I.stop} size={16} />
               </button>
@@ -874,7 +874,7 @@ export default function Home() {
                 onClick={handleSend}
                 disabled={!ready || !input.trim()}
                 aria-label="Enviar"
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--on-accent)] shadow-[var(--shadow-glow)] transition active:scale-95 disabled:opacity-40"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--on-accent)] shadow-[var(--shadow-glow)] transition active:scale-95 disabled:opacity-40"
                 style={{ background: "var(--brand-grad)" }}
               >
                 <Icon d={I.send} size={18} />
@@ -966,7 +966,7 @@ export default function Home() {
                   type="button"
                   onClick={handleLogout}
                   aria-label="Cerrar sesión"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--ink-dim)] hover:bg-red-500/10 hover:text-red-500"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--ink-dim)] hover:bg-red-500/10 hover:text-red-500"
                 >
                   <Icon d={I.logout} size={17} />
                 </button>
@@ -986,7 +986,7 @@ export default function Home() {
                       aria-checked={theme === value}
                       onClick={() => handleThemeChange(value)}
                       disabled={themeSaving}
-                      className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-medium transition ${
+                      className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg py-2 text-[13px] font-medium transition ${
                         theme === value
                           ? "bg-[var(--panel-2)] text-[var(--ink)] shadow-sm ring-1 ring-[var(--accent-bright)]"
                           : "text-[var(--ink-dim)]"
