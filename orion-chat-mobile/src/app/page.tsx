@@ -123,7 +123,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         <button
           type="submit"
           disabled={loading}
-          className="mt-5 w-full rounded-full bg-[var(--accent-bright)] py-2.5 text-sm font-semibold text-[var(--void)] shadow-[var(--shadow-glow)] transition-opacity disabled:opacity-50"
+          className="mt-5 w-full rounded-full bg-[var(--accent-bright)] py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-glow)] transition-opacity disabled:opacity-50"
         >
           {loading ? "Ingresando…" : "Ingresar"}
         </button>
@@ -423,7 +423,7 @@ export default function Home() {
             onClick={handleSend}
             disabled={!ready || !input.trim() || isStreaming}
             aria-label="Enviar"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-bright)] text-[var(--void)] shadow-[var(--shadow-glow)] disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-bright)] text-white shadow-[var(--shadow-glow)] disabled:opacity-40"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 13V3M3 8l5-5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -439,9 +439,9 @@ export default function Home() {
             <div className="flex items-center gap-2 px-4 pb-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--void)]">
                 <svg viewBox="0 0 32 32" fill="none" className="h-8 w-8">
-                  <rect width="32" height="32" rx="7" fill="#0f1b30" />
-                  <circle cx="16" cy="16" r="9" stroke="#f2994a" strokeWidth="2.4" />
-                  <circle cx="23" cy="9" r="2.6" fill="#f2994a" />
+                  <rect width="32" height="32" rx="7" fill="#0a0a0f" />
+                  <circle cx="16" cy="16" r="9" stroke="#8b5cf6" strokeWidth="2.4" />
+                  <circle cx="23" cy="9" r="2.6" fill="#8b5cf6" />
                 </svg>
               </div>
               <p className="font-[family-name:var(--font-display)] text-sm font-semibold">Orion Chat</p>

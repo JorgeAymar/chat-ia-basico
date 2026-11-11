@@ -1,3 +1,7 @@
+// Marca que hay JS: las animaciones de entrada (.reveal) solo ocultan el
+// contenido si este script corre — sin JS, todo queda visible.
+document.documentElement.classList.add("js");
+
 // ---------- i18n ----------
 //
 // Sin build step: un diccionario plano por idioma, aplicado in-place sobre
@@ -15,13 +19,23 @@ var TRANSLATIONS = {
     "nav.motivacion": "Motivación",
     "nav.resultado": "Resultado",
     "nav.acceso": "Pedir acceso",
+    "nav.login": "Iniciar sesión",
+    "mock.user": "¿Qué novedades hubo esta semana en IA?",
+    "mock.assistant": "Te resumo las tres más relevantes, con sus fuentes:",
+    "mock.composer": "Escribí un mensaje…",
+    "hero.eyebrow": "Chat IA autoalojado",
     "hero.tagline":
-      "Chat con modelos de IA corriendo en Ollama — local o remoto — con streaming en vivo, búsqueda web con fuentes citadas, memoria persistente y soporte multiusuario.",
+      "Chat con modelos de IA, con streaming en vivo, búsqueda web con fuentes citadas, memoria persistente y soporte multiusuario.",
     "hero.login": "Iniciar sesión",
     "hero.mobile": "Abrir en mobile",
+    "hero.trust": "Elegí el modelo de IA que quieras · Open source · Self-hosted",
+    "eyebrow.que_es": "Producto",
+    "eyebrow.motivacion": "Por qué",
+    "eyebrow.resultado": "Estado actual",
+    "eyebrow.acceso": "Acceso",
     "que_es.title": "¿Qué es Orion Chat?",
     "que_es.subtitle":
-      "Un asistente de chat tipo ChatGPT, pero autoalojado: hablás con modelos servidos por tu propio Ollama, local o remoto.",
+      "Un asistente de chat tipo ChatGPT, pero autoalojado: elegís qué modelo de IA te responde y dónde corre.",
     "feat.streaming.title": "Streaming en vivo",
     "feat.streaming.desc": "Las respuestas van apareciendo token a token, igual que un chat real.",
     "feat.search.title": "Búsqueda web citada",
@@ -33,7 +47,7 @@ var TRANSLATIONS = {
     "motivacion.title": "Motivación",
     "motivacion.subtitle": "Por qué existe este proyecto en vez de usar un chat de IA en la nube.",
     "motivacion.p1":
-      "<strong>Control total de los datos.</strong> Cada conversación, cada adjunto y cada nota de memoria quedan en una base que vos administrás — no en la infraestructura de un tercero. El modelo que responde también lo elegís vos: Ollama local, corriendo en tu propia máquina, o un Ollama remoto si preferís más potencia.",
+      "<strong>Control total de los datos.</strong> Cada conversación, cada adjunto y cada nota de memoria quedan en una base que vos administrás — no en la infraestructura de un tercero. El modelo que responde también lo elegís vos: corriendo en tu propia máquina, o en un servidor remoto si preferís más potencia.",
     "motivacion.p2":
       "<strong>Sin atarse a un proveedor.</strong> Nada de licencias por asiento ni planes que cambian de precio. Orion Chat es la base para tener un asistente propio, extensible, con el mismo nivel de cuidado en el diseño que un producto comercial — pero corriendo donde vos decidas.",
     "resultado.title": "Resultado",
@@ -42,7 +56,7 @@ var TRANSLATIONS = {
     "result.2": "Multiusuario con invitaciones por correo y roles de owner/miembro.",
     "result.3": "Memoria persistente por usuario: notas que el asistente recuerda entre conversaciones.",
     "result.4": "Exportar cualquier conversación para guardarla o compartirla.",
-    "result.5": "Un mismo diseño navy/naranja propio en los dos clientes, de punta a punta.",
+    "result.5": "Un mismo diseño propio, moderno y consistente en los dos clientes, de punta a punta.",
     "acceso.title": "¿Querés probarlo?",
     "acceso.subtitle": "Por ahora el acceso es solo por invitación. Escribime y te doy de alta una cuenta.",
     "acceso.cta": "Pedir acceso por correo",
@@ -55,13 +69,23 @@ var TRANSLATIONS = {
     "nav.motivacion": "Motivation",
     "nav.resultado": "Result",
     "nav.acceso": "Request access",
+    "nav.login": "Sign in",
+    "mock.user": "What happened in AI this week?",
+    "mock.assistant": "Here are the three most relevant updates, with sources:",
+    "mock.composer": "Type a message…",
+    "hero.eyebrow": "Self-hosted AI chat",
     "hero.tagline":
-      "Chat with AI models running on Ollama — local or remote — with live streaming, web search with cited sources, persistent memory, and multi-user support.",
+      "Chat with AI models, with live streaming, web search with cited sources, persistent memory, and multi-user support.",
     "hero.login": "Sign in",
     "hero.mobile": "Open on mobile",
+    "hero.trust": "Pick any AI model you want · Open source · Self-hosted",
+    "eyebrow.que_es": "Product",
+    "eyebrow.motivacion": "Why",
+    "eyebrow.resultado": "Current status",
+    "eyebrow.acceso": "Access",
     "que_es.title": "What is Orion Chat?",
     "que_es.subtitle":
-      "A ChatGPT-style chat assistant, but self-hosted: you talk to models served by your own Ollama, local or remote.",
+      "A ChatGPT-style chat assistant, but self-hosted: you choose which AI model answers and where it runs.",
     "feat.streaming.title": "Live streaming",
     "feat.streaming.desc": "Responses appear token by token, just like a real chat.",
     "feat.search.title": "Cited web search",
@@ -73,7 +97,7 @@ var TRANSLATIONS = {
     "motivacion.title": "Motivation",
     "motivacion.subtitle": "Why this project exists instead of using a cloud AI chat.",
     "motivacion.p1":
-      "<strong>Full control over your data.</strong> Every conversation, attachment, and memory note lives on a database you run — not on a third party's infrastructure. You also choose which model answers: a local Ollama running on your own machine, or a remote one if you need more power.",
+      "<strong>Full control over your data.</strong> Every conversation, attachment, and memory note lives on a database you run — not on a third party's infrastructure. You also choose which model answers: running on your own machine, or on a remote server if you need more power.",
     "motivacion.p2":
       "<strong>No vendor lock-in.</strong> No per-seat licenses, no pricing plans that change under you. Orion Chat is the foundation for an assistant of your own, extensible, with the same design care as a commercial product — but running wherever you decide.",
     "resultado.title": "Result",
@@ -82,7 +106,7 @@ var TRANSLATIONS = {
     "result.2": "Multi-user with email invitations and owner/member roles.",
     "result.3": "Per-user persistent memory: notes the assistant remembers across conversations.",
     "result.4": "Export any conversation to save or share it.",
-    "result.5": "The same navy/orange design across both clients, end to end.",
+    "result.5": "The same modern, consistent design across both clients, end to end.",
     "acceso.title": "Want to try it?",
     "acceso.subtitle": "Access is invite-only for now. Write to me and I'll set up an account for you.",
     "acceso.cta": "Request access by email",
@@ -95,13 +119,23 @@ var TRANSLATIONS = {
     "nav.motivacion": "Motivação",
     "nav.resultado": "Resultado",
     "nav.acceso": "Pedir acesso",
+    "nav.login": "Entrar",
+    "mock.user": "Quais foram as novidades de IA desta semana?",
+    "mock.assistant": "Aqui estão as três mais relevantes, com as fontes:",
+    "mock.composer": "Escreva uma mensagem…",
+    "hero.eyebrow": "Chat IA auto-hospedado",
     "hero.tagline":
-      "Chat com modelos de IA rodando no Ollama — local ou remoto — com streaming ao vivo, busca na web com fontes citadas, memória persistente e suporte a múltiplos usuários.",
+      "Chat com modelos de IA, com streaming ao vivo, busca na web com fontes citadas, memória persistente e suporte a múltiplos usuários.",
     "hero.login": "Entrar",
     "hero.mobile": "Abrir no mobile",
+    "hero.trust": "Escolha o modelo de IA que quiser · Open source · Self-hosted",
+    "eyebrow.que_es": "Produto",
+    "eyebrow.motivacion": "Por quê",
+    "eyebrow.resultado": "Estado atual",
+    "eyebrow.acceso": "Acesso",
     "que_es.title": "O que é o Orion Chat?",
     "que_es.subtitle":
-      "Um assistente de chat estilo ChatGPT, mas auto-hospedado: você conversa com modelos servidos pelo seu próprio Ollama, local ou remoto.",
+      "Um assistente de chat estilo ChatGPT, mas auto-hospedado: você escolhe qual modelo de IA responde e onde ele roda.",
     "feat.streaming.title": "Streaming ao vivo",
     "feat.streaming.desc": "As respostas vão aparecendo token a token, igual a um chat de verdade.",
     "feat.search.title": "Busca na web com citações",
@@ -113,7 +147,7 @@ var TRANSLATIONS = {
     "motivacion.title": "Motivação",
     "motivacion.subtitle": "Por que este projeto existe em vez de usar um chat de IA na nuvem.",
     "motivacion.p1":
-      "<strong>Controle total dos dados.</strong> Cada conversa, cada anexo e cada nota de memória ficam num banco que você administra — não na infraestrutura de terceiros. O modelo que responde também é escolhido por você: Ollama local, rodando na sua própria máquina, ou um Ollama remoto se precisar de mais poder.",
+      "<strong>Controle total dos dados.</strong> Cada conversa, cada anexo e cada nota de memória ficam num banco que você administra — não na infraestrutura de terceiros. O modelo que responde também é escolhido por você: rodando na sua própria máquina, ou num servidor remoto se precisar de mais poder.",
     "motivacion.p2":
       "<strong>Sem depender de um fornecedor.</strong> Nada de licenças por usuário nem planos que mudam de preço. Orion Chat é a base para ter um assistente próprio, extensível, com o mesmo cuidado de design de um produto comercial — mas rodando onde você decidir.",
     "resultado.title": "Resultado",
@@ -122,7 +156,7 @@ var TRANSLATIONS = {
     "result.2": "Múltiplos usuários com convites por e-mail e papéis de owner/membro.",
     "result.3": "Memória persistente por usuário: notas que o assistente lembra entre conversas.",
     "result.4": "Exportar qualquer conversa para salvar ou compartilhar.",
-    "result.5": "O mesmo design navy/laranja próprio nos dois clientes, de ponta a ponta.",
+    "result.5": "O mesmo design próprio, moderno e consistente nos dois clientes, de ponta a ponta.",
     "acceso.title": "Quer experimentar?",
     "acceso.subtitle": "Por enquanto o acesso é só por convite. Me escreva que eu crio uma conta para você.",
     "acceso.cta": "Pedir acesso por e-mail",
@@ -198,6 +232,34 @@ applyLanguage(detectInitialLang());
 // CSS `scroll-behavior: smooth` ya cubriría esto en navegadores modernos,
 // pero algunos (viejos WebKit/iOS) todavía lo ignoran — este listener es el
 // fallback explícito.
+// ---------- reveal on scroll ----------
+(function () {
+  var items = document.querySelectorAll(".reveal");
+  var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced || !("IntersectionObserver" in window)) {
+    items.forEach(function (el) { el.classList.add("is-visible"); });
+    return;
+  }
+  var observer = new IntersectionObserver(
+    function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        // Escalonado leve entre hermanos (tarjetas, checks) para que no
+        // entren todos de golpe.
+        var siblings = Array.prototype.indexOf.call(entry.target.parentNode.children, entry.target);
+        entry.target.style.transitionDelay = Math.min(siblings, 4) * 70 + "ms";
+        entry.target.classList.add("is-visible");
+        // El delay solo es para la entrada: si queda puesto, también retrasa
+        // el hover de las tarjetas.
+        setTimeout(function () { entry.target.style.transitionDelay = ""; }, 900);
+        observer.unobserve(entry.target);
+      });
+    },
+    { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+  );
+  items.forEach(function (el) { observer.observe(el); });
+})();
+
 document.querySelectorAll('a[href^="#"]').forEach(function (link) {
   link.addEventListener("click", function (e) {
     var id = link.getAttribute("href").slice(1);

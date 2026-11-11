@@ -1,22 +1,21 @@
 @import "tailwindcss";
 
-/* Mismos tokens que src/app/globals.css (cliente web) y que el design system
-   "Orion Navy Fintech" creado en Stitch (projects/17848090580321331337):
-   navy #0f1b30 de base, acento naranja #f2994a reservado para detalles de
-   alto contraste, nunca como fondo grande. Ver ese proyecto de Stitch para
-   el razonamiento completo (designMd) detrás de cada valor. */
+/* Mismos tokens que orion-chat-web/src/app/globals.css y la landing —
+   paleta "violeta eléctrico": fondo casi negro #0a0a0f, índigo #6366f1
+   para rellenos y violeta #8b5cf6 reservado para CTAs/foco/indicadores
+   activos, nunca como fondo grande. */
 :root {
-  --ink: #eef2fa;
-  --ink-dim: #8a9bb8;
-  --void: #0f1b30;
-  --void-2: #16233d;
-  --panel: #1c2d4a;
-  --panel-2: #24375a;
-  --line: #33456b;
-  --accent: #3d5a80;
-  --accent-bright: #f2994a;
-  --accent-dim: rgba(242, 153, 74, 0.12);
-  --shadow-glow: 0 0 24px rgba(242, 153, 74, 0.35);
+  --ink: #f4f4f8;
+  --ink-dim: #9696ab;
+  --void: #0a0a0f;
+  --void-2: #0f0f16;
+  --panel: #13131a;
+  --panel-2: #1b1b25;
+  --line: #26263a;
+  --accent: #6366f1;
+  --accent-bright: #8b5cf6;
+  --accent-dim: rgba(139, 92, 246, 0.14);
+  --shadow-glow: 0 0 28px rgba(139, 92, 246, 0.4);
 }
 
 @theme inline {

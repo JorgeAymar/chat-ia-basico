@@ -4,7 +4,7 @@ import "./globals.css";
 import { apiUrl } from "@/lib/base-path";
 
 // Mismas familias que el cliente web (ver su layout.tsx): Sora para títulos,
-// Inter para cuerpo — parte del mismo design system "Orion Navy Fintech".
+// Inter para cuerpo — mismo design system que el cliente web y la landing.
 const sora = Sora({
   variable: "--font-display",
   subsets: ["latin"],
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f1b30",
+  themeColor: "#0a0a0f",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

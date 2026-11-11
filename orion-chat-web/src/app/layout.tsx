@@ -6,10 +6,9 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 import { APP_NAME } from "@/lib/app-info";
 
-// Tipografía del rediseño "fintech navy": Sora para títulos (geometría
-// condensada y moderna, el estilo típico de dashboard financiero de la
-// referencia), Inter para el cuerpo —se mantiene, ya es neutra y legible
-// para texto de chat/UI.
+// Sora para títulos (geometría condensada y moderna), Inter para el
+// cuerpo —neutra y legible para texto de chat/UI. Compartidas con la app
+// mobile y la landing.
 const sora = Sora({
   variable: "--font-display",
   subsets: ["latin"],

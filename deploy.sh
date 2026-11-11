@@ -168,6 +168,21 @@ fi
 
 echo "==> Listo. ${APP_URL:-la app} sirve desde ${NEW_NAME} (:${NEW_PORT})."
 
+# ── landing estática (/presentacion) ─────────────────────────────────────
+# Copia atómica: se arma en un dir temporal y se intercambia con `mv`, así
+# nginx nunca sirve una mezcla de archivos viejos y nuevos a mitad de copia.
+LANDING_DIR="${ORION_LANDING_DIR:-/var/www/orion-landing}"
+echo "==> Publicando la landing en ${LANDING_DIR}…"
+LANDING_TMP="${LANDING_DIR}.tmp.$$"
+rm -rf "$LANDING_TMP"
+mkdir -p "$(dirname "$LANDING_DIR")"
+cp -r orion-chat-landing "$LANDING_TMP"
+chmod -R a+rX "$LANDING_TMP"
+rm -rf "${LANDING_DIR}.old"
+[ -d "$LANDING_DIR" ] && mv "$LANDING_DIR" "${LANDING_DIR}.old"
+mv "$LANDING_TMP" "$LANDING_DIR"
+rm -rf "${LANDING_DIR}.old"
+
 # ── mobile (PWA bajo /m) ─────────────────────────────────────────────────
 # Mismo patrón blue/green que arriba, pero totalmente separado: su propio
 # par de puertos, su propio STATE_FILE y su propio archivo de upstream de
@@ -187,7 +202,8 @@ MOBILE_HEALTH_PATH="${ORION_MOBILE_HEALTH_PATH:-/m}"
 echo "==> Construyendo la imagen de la app mobile…"
 # Contexto orion-chat-mobile/, NO la raíz del repo: es un proyecto Next.js
 # aparte con su propio package.json/Dockerfile (ver su Dockerfile ahí).
-docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m -t orion-mobile:latest orion-chat-mobile/
+: "${APP_URL:?falta APP_URL en $ENV_FILE (la mobile lo necesita en build time para sus rewrites)}"
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m --build-arg WEB_APP_ORIGIN="$APP_URL" -t orion-mobile:latest orion-chat-mobile/
 
 mkdir -p "$(dirname "$MOBILE_STATE_FILE")"
 MOBILE_CURRENT_PORT="$(cat "$MOBILE_STATE_FILE" 2>/dev/null || echo "")"

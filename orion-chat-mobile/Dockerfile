@@ -14,14 +14,17 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# WEB_APP_ORIGIN solo importa en runtime (la URL real del backend puede no
-# existir todavía durante el build de CI); NEXT_PUBLIC_BASE_PATH en cambio sí
-# hace falta en build time — Next lo inlinea en el bundle del cliente, y
-# basePath es un valor de build (ver next.config.ts) — por eso es ARG acá
-# Y ENV más abajo en runner, a diferencia de WEB_APP_ORIGIN que alcanza con
-# pasarlo recién al `docker run`.
+# Los dos hacen falta en BUILD time: NEXT_PUBLIC_BASE_PATH porque Next lo
+# inlinea en el bundle del cliente, y WEB_APP_ORIGIN porque los rewrites de
+# next.config.ts se resuelven al compilar y quedan fijos en
+# .next/routes-manifest.json — pasarlo recién al `docker run` no sirve (bug
+# real: el destino quedó horneado como el default http://localhost:3000, que
+# dentro del contenedor es esta misma app, y todo /m/api/* daba 404).
 ARG NEXT_PUBLIC_BASE_PATH=""
+ARG WEB_APP_ORIGIN=""
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
+ENV WEB_APP_ORIGIN=${WEB_APP_ORIGIN}
+RUN test -n "$WEB_APP_ORIGIN" || (echo "falta --build-arg WEB_APP_ORIGIN" >&2; exit 1)
 RUN npm run build
 
 # ── runner ────────────────────────────────────────────────────────────────

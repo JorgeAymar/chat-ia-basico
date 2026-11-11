@@ -14,8 +14,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Chat con modelos de Ollama, optimizado para mobile.",
     start_url: apiUrl("/"),
     display: "standalone",
-    background_color: "#0f1b30",
-    theme_color: "#0f1b30",
+    background_color: "#0a0a0f",
+    theme_color: "#0a0a0f",
     icons: [
       { src: apiUrl("/icon-512"), sizes: "512x512", type: "image/png" },
       { src: apiUrl("/icon-512"), sizes: "512x512", type: "image/png", purpose: "maskable" },

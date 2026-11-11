@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
-/* Paleta oscura "fintech navy": fondo azul marino profundo, acento naranja
-   vívido para CTAs (inspirado en una referencia de dashboard financiero).
-   Reemplaza la paleta oliva anterior — mismo mecanismo de siempre, solo
-   cambian los valores de los tokens. */
+/* Paleta "violeta eléctrico": fondo casi negro, índigo para rellenos
+   (burbuja del usuario, selección) y violeta vívido para CTAs, foco e
+   indicadores activos. Mismos tokens que orion-chat-mobile y la landing —
+   cambiar la paleta es cambiar solo estos valores en los tres lados. */
 :root {
-  --ink: #eef2fa;
-  --ink-dim: #8a9bb8;
-  --void: #0f1b30;
-  --void-2: #16233d;
-  --panel: #1c2d4a;
-  --panel-2: #24375a;
-  --line: #33456b;
-  --accent: #3d5a80;
-  --accent-bright: #f2994a;
-  --accent-dim: rgba(242, 153, 74, 0.12);
-  --shadow-glow: 0 0 24px rgba(242, 153, 74, 0.35);
+  --ink: #f4f4f8;
+  --ink-dim: #9696ab;
+  --void: #0a0a0f;
+  --void-2: #0f0f16;
+  --panel: #13131a;
+  --panel-2: #1b1b25;
+  --line: #26263a;
+  --accent: #6366f1;
+  --accent-bright: #8b5cf6;
+  --accent-dim: rgba(139, 92, 246, 0.14);
+  --shadow-glow: 0 0 28px rgba(139, 92, 246, 0.4);
 }
 
 @theme inline {
