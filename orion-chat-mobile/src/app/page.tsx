@@ -124,7 +124,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   }
 
   const inputClass =
-    "mt-1.5 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3.5 py-3 text-[15px] text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-dim)] focus:border-[var(--accent-bright)] focus:ring-2 focus:ring-[var(--accent-dim)]";
+    "mt-1.5 w-full rounded-xl border border-[var(--line)] bg-[var(--void)] px-3.5 py-3 text-base text-[var(--ink)] outline-none transition placeholder:text-[var(--ink-dim)] focus:border-[var(--accent-bright)] focus:ring-2 focus:ring-[var(--accent-dim)]";
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[var(--void)] px-5">
@@ -497,8 +497,32 @@ export default function Home() {
   }, [currentUser, refreshConversations]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // "smooth" en cada token de un stream reinicia la animación decenas de
+    // veces por segundo y en Safari iOS se ve entrecortado.
+    bottomRef.current?.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
+  }, [messages, isStreaming]);
+
+  // Safari iOS no achica el layout viewport cuando abre el teclado: 100dvh
+  // sigue midiendo lo mismo y el composer queda tapado o flotando. El
+  // visualViewport sí refleja el espacio real; se publica como --app-h y el
+  // contenedor raíz usa esa altura.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      document.documentElement.style.setProperty("--app-h", `${vv.height}px`);
+      // iOS desplaza la página para mostrar el campo enfocado; se revierte
+      // porque el contenedor ya se ajusta solo.
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
 
   // Textarea que crece con el contenido, hasta un tope.
   useEffect(() => {
@@ -705,10 +729,13 @@ export default function Home() {
   );
 
   return (
-    <div className="flex h-dvh flex-col bg-[var(--void)] text-[var(--ink)]">
+    <div
+      className="fixed inset-x-0 top-0 flex flex-col bg-[var(--void)] text-[var(--ink)]"
+      style={{ height: "var(--app-h, 100dvh)" }}
+    >
       {/* Header compacto con blur, como en Stitch */}
       <header
-        className="sticky top-0 z-30 flex items-center gap-2 border-b border-[var(--line)] bg-[var(--void)]/85 px-3 backdrop-blur-md"
+        className="sticky top-0 z-30 flex items-center gap-2 border-b border-[var(--line)] bg-[var(--void)] px-3"
         style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))", paddingBottom: "0.5rem" }}
       >
         <button
@@ -764,7 +791,7 @@ export default function Home() {
       </header>
 
       {/* Conversación */}
-      <div className="flex-1 overflow-y-auto px-4 pb-44 pt-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-4">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
             <LogoTile size={52} />
@@ -793,18 +820,15 @@ export default function Home() {
 
       {/* Composer flotante, respetando el safe-area */}
       <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pt-8"
-        style={{
-          paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
-          background: "linear-gradient(to top, var(--void) 60%, transparent)",
-        }}
+        className="relative z-30 shrink-0 bg-[var(--void)] px-3 pt-2"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {error && (
-          <div className="pointer-events-auto mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
+          <div className="mb-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-500">
             {error}
           </div>
         )}
-        <div className="pointer-events-auto rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-2.5 shadow-2xl transition focus-within:border-[var(--accent-bright)] focus-within:ring-2 focus-within:ring-[var(--accent-dim)]">
+        <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-2.5 shadow-2xl transition focus-within:border-[var(--accent-bright)] focus-within:ring-2 focus-within:ring-[var(--accent-dim)]">
           <textarea
             ref={textareaRef}
             value={input}
@@ -818,7 +842,7 @@ export default function Home() {
             placeholder={ready ? "Escribe un mensaje o pregunta a Orion..." : "Conectando con el servidor…"}
             disabled={!ready}
             rows={1}
-            className="block max-h-40 min-h-[2.75rem] w-full resize-none bg-transparent px-1.5 py-1.5 text-[15px] leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] disabled:opacity-50"
+            className="block max-h-40 min-h-[2.75rem] w-full resize-none bg-transparent px-1.5 py-1.5 text-base leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] disabled:opacity-50"
           />
           <div className="mt-1 flex items-center gap-2 border-t border-[var(--line)] pt-2">
             <button
@@ -863,7 +887,7 @@ export default function Home() {
       {/* Drawer de historial + perfil */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-[var(--overlay)] backdrop-blur-[2px]" onClick={() => setDrawerOpen(false)} />
+          <div className="absolute inset-0 bg-[var(--overlay)]" onClick={() => setDrawerOpen(false)} />
           <aside
             className="relative z-10 flex h-full w-[86%] max-w-[320px] flex-col border-r border-[var(--line)] bg-[var(--panel)]"
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
@@ -897,7 +921,7 @@ export default function Home() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar en el historial..."
-                  className="w-full rounded-xl border border-[var(--line)] bg-[var(--void)] py-2 pl-9 pr-3 text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] focus:border-[var(--accent-bright)]"
+                  className="w-full rounded-xl border border-[var(--line)] bg-[var(--void)] py-2 pl-9 pr-3 text-base text-[var(--ink)] outline-none placeholder:text-[var(--ink-dim)] focus:border-[var(--accent-bright)]"
                 />
               </div>
             </div>
