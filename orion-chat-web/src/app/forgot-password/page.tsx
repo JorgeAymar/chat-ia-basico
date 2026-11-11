@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { APP_NAME } from "@/lib/app-info";
@@ -28,7 +29,7 @@ export default function ForgotPasswordPage() {
     setFormError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/forgot-password", {
+      const res = await fetch(withBase("/api/auth/forgot-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

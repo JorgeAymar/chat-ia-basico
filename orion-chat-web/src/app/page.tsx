@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isCloudModel, shortModel } from "@/lib/model-utils";
 import { Logo } from "@/components/Logo";
@@ -146,13 +147,13 @@ export default function Home() {
 
   const refreshConversations = useCallback(async (query = "") => {
     const url = query ? `/api/conversations?q=${encodeURIComponent(query)}` : "/api/conversations";
-    const res = await fetch(url);
+    const res = await fetch(withBase(url));
     const data = await res.json();
     setConversations(data.conversations ?? []);
   }, []);
 
   useEffect(() => {
-    fetch("/api/models")
+    fetch(withBase("/api/models"))
       .then((r) => r.json())
       .then((data) => {
         setModels(data.models ?? []);
@@ -169,7 +170,7 @@ export default function Home() {
 
     // El proxy ya garantiza que solo llega acá quien tiene sesión: esto no
     // es un chequeo de acceso, es solo para saber quién es y si es owner.
-    fetch("/api/auth/me")
+    fetch(withBase("/api/auth/me"))
       .then((r) => r.json())
       .then((data) => setCurrentUser(data.user ?? null))
       .catch(() => setCurrentUser(null));
@@ -375,7 +376,7 @@ export default function Home() {
     setActiveId(id);
     setSidebarOpen(false);
     setPendingAttachments([]);
-    const res = await fetch(`/api/conversations/${id}`);
+    const res = await fetch(withBase(`/api/conversations/${id}`));
     const data = await res.json();
     if (res.ok) {
       setMessages(data.conversation.messages);
@@ -393,7 +394,7 @@ export default function Home() {
     const id = confirmDeleteId;
     if (!id) return;
     closeDeleteModal();
-    await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+    await fetch(withBase(`/api/conversations/${id}`), { method: "DELETE" });
     if (id === activeId) {
       setActiveId(null);
       setMessages([]);
@@ -405,7 +406,7 @@ export default function Home() {
     // Optimista: fijar tiene que sentirse instantáneo, y si falla el próximo
     // refresco devuelve la lista al estado real.
     setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, pinned } : c)));
-    await fetch(`/api/conversations/${id}`, {
+    await fetch(withBase(`/api/conversations/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned }),
@@ -415,7 +416,7 @@ export default function Home() {
 
   async function handleRename(id: string, title: string) {
     setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)));
-    await fetch(`/api/conversations/${id}`, {
+    await fetch(withBase(`/api/conversations/${id}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -428,7 +429,7 @@ export default function Home() {
     // Cambiar de modelo a mitad de conversación se persiste: si no, al
     // recargar volvería al modelo con el que arrancó la charla.
     if (activeId) {
-      await fetch(`/api/conversations/${activeId}`, {
+      await fetch(withBase(`/api/conversations/${activeId}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model }),
@@ -445,8 +446,8 @@ export default function Home() {
     setInviteSuccessMessage(null);
     try {
       const [settingsRes, memoriesRes] = await Promise.all([
-        fetch("/api/settings"),
-        fetch("/api/memory"),
+        fetch(withBase("/api/settings")),
+        fetch(withBase("/api/memory")),
       ]);
       const settingsData = await settingsRes.json();
       const memoriesData = await memoriesRes.json();
@@ -464,7 +465,7 @@ export default function Home() {
     if (currentUser?.role === "OWNER") {
       setUsersLoading(true);
       try {
-        const res = await fetch("/api/auth/invite");
+        const res = await fetch(withBase("/api/auth/invite"));
         const data = await res.json();
         setUsers(data.users ?? []);
       } catch {
@@ -483,7 +484,7 @@ export default function Home() {
     setInviteError(null);
     setInviteSuccessMessage(null);
     try {
-      const res = await fetch("/api/auth/invite", {
+      const res = await fetch(withBase("/api/auth/invite"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -514,11 +515,11 @@ export default function Home() {
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(withBase("/api/auth/logout"), { method: "POST" });
     // El proxy hace el resto: al no encontrar sesión en la próxima carga,
     // manda a /login. Un location.href fuerza esa carga completa (no un
     // router.push de cliente, que dejaría estado viejo en memoria).
-    window.location.href = "/login";
+    window.location.href = withBase("/login");
   }
 
   function closeSettingsModal() {
@@ -530,7 +531,7 @@ export default function Home() {
     setSettingsSaving(true);
     setSettingsError(null);
     try {
-      const res = await fetch("/api/settings", {
+      const res = await fetch(withBase("/api/settings"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ systemPrompt: systemPromptDraft }),
@@ -550,7 +551,7 @@ export default function Home() {
     if (!content) return;
     setSettingsError(null);
     try {
-      const res = await fetch("/api/memory", {
+      const res = await fetch(withBase("/api/memory"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
@@ -566,7 +567,7 @@ export default function Home() {
 
   async function handleDeleteMemory(id: string) {
     setMemories((prev) => prev.filter((m) => m.id !== id));
-    await fetch(`/api/memory/${id}`, { method: "DELETE" });
+    await fetch(withBase(`/api/memory/${id}`), { method: "DELETE" });
   }
 
   async function handleFilesSelected(files: FileList | null) {
@@ -584,7 +585,7 @@ export default function Home() {
         try {
           const form = new FormData();
           form.append("file", file);
-          const res = await fetch("/api/upload", { method: "POST", body: form });
+          const res = await fetch(withBase("/api/upload"), { method: "POST", body: form });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error ?? `No se pudo procesar "${file.name}"`);
           setPendingAttachments((prev) => [...prev, data.attachment]);
@@ -644,7 +645,7 @@ export default function Home() {
       setStatus(null);
 
       try {
-        const res = await fetch("/api/chat", {
+        const res = await fetch(withBase("/api/chat"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ conversationId, ...body }),
@@ -713,7 +714,7 @@ export default function Home() {
 
   async function ensureConversation(): Promise<string | null> {
     if (activeId) return activeId;
-    const res = await fetch("/api/conversations", {
+    const res = await fetch(withBase("/api/conversations"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: selectedModel }),

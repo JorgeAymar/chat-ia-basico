@@ -1,12 +1,9 @@
 import { ImageResponse } from "next/og";
 
-// Ícono para "agregar a inicio" en iOS — mismo diseño que icon.tsx, en el
-// tamaño que Apple recomienda (180x180), con el trazo del anillo escalado
-// proporcionalmente para que no se vea desproporcionadamente fino.
-export const size = { width: 180, height: 180 };
-export const contentType = "image/png";
-
-export default function AppleIcon() {
+// Ruta común y no la convención icon.tsx: bajo basePath (/app), el <link>
+// que Next arma solo para esa convención sale sin el prefijo y da 404. Este
+// se declara a mano en layout.tsx con withBase(). Mismo diseño que Logo.tsx.
+export async function GET() {
   return new ImageResponse(
     (
       <svg width={180} height={180} viewBox="0 0 32 32" fill="none">
@@ -15,6 +12,6 @@ export default function AppleIcon() {
         <circle cx="23" cy="9" r="2.6" fill="#8b5cf6" />
       </svg>
     ),
-    { ...size }
+    { width: 180, height: 180 }
   );
 }

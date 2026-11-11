@@ -10,7 +10,7 @@ import type { NextConfig } from "next";
 // sesión (httpOnly, sin `Domain` explícito — ver src/lib/auth/session.ts)
 // quede scopeada al dominio de ESTA app en vez del dominio del backend: el
 // navegador nunca se entera de que hay dos servidores distintos.
-const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN ?? "http://localhost:3000";
+const WEB_APP_ORIGIN = process.env.WEB_APP_ORIGIN ?? "http://localhost:3000/app";
 
 // En dev esta app corre sola en su propio puerto, sin prefijo. En
 // producción se monta bajo /m del MISMO dominio que el cliente web (ver

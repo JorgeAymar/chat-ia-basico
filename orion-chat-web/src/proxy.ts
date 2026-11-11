@@ -21,18 +21,21 @@ export default async function proxy(req: NextRequest) {
 
   const session = await decryptSessionCookie(req.cookies.get(COOKIE_NAME)?.value);
 
+  // Bajo basePath (/app), req.nextUrl.pathname llega SIN el prefijo y
+  // clonar nextUrl + cambiar pathname lo conserva al serializar: así los
+  // redirects quedan en /app/... sin armar la URL a mano.
   if (!isPublic && !session) {
-    // La raíz es la única página protegida que puede pisar alguien sin
-    // cuenta (todo lo demás no autenticado ya cae en PUBLIC_PATHS): en vez
-    // de un formulario de login sin contexto, que vea primero la landing
-    // (orion-chat-landing/, HTML estático servido directo por nginx en
-    // /presentacion — nunca llega a este proceso de Next).
-    const destination = pathname === "/" ? "/presentacion" : "/login";
-    return NextResponse.redirect(new URL(destination, req.url));
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
   if (isPublic && session) {
-    return NextResponse.redirect(new URL("/", req.url));
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
@@ -40,10 +43,13 @@ export default async function proxy(req: NextRequest) {
 
 // Deja pasar sin chequeo: las rutas de API (cada una valida su propia
 // sesión y responde JSON, no tiene sentido redirigirlas a /login con HTML),
-// los assets de Next, y el favicon/icon/apple-icon (generados por
-// src/app/icon.tsx y apple-icon.tsx) — sin esto, un visitante sin sesión en
-// /login recibía un redirect en vez del ícono y la pestaña se quedaba sin
-// favicon.
+// los assets de Next, y los íconos (rutas icon-32/icon-180) — sin esto, un
+// visitante sin sesión en /login recibía un redirect en vez del ícono.
+//
+// "/" va aparte a propósito: bajo basePath el patrón de abajo compila a
+// ^/app/(...) con la barra obligatoria, y la raíz de la app ("/app", sin
+// barra final — Next redirige /app/ → /app) quedaba sin proxy y se servía
+// sin pedir login.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon|apple-icon).*)"],
+  matcher: ["/", "/((?!api|_next/static|_next/image|favicon.ico|icon-).*)"],
 };

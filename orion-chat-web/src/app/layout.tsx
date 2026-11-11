@@ -7,6 +7,7 @@ import "./globals.css";
 import { cookies } from "next/headers";
 import { APP_NAME } from "@/lib/app-info";
 import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
+import { withBase } from "@/lib/base-path";
 
 // Sora para títulos (geometría condensada y moderna), Inter para el
 // cuerpo —neutra y legible para texto de chat/UI. Compartidas con la app
@@ -33,6 +34,12 @@ export const metadata: Metadata = {
   title: APP_NAME,
   description:
     "Chat con modelos de Ollama: streaming, búsqueda web con citas, adjuntos y memoria persistente.",
+  // Declarados a mano: bajo basePath, el <link> automático de la convención
+  // icon.tsx sale sin /app (ver src/app/icon-32/route.tsx).
+  icons: {
+    icon: withBase("/icon-32"),
+    apple: withBase("/icon-180"),
+  },
 };
 
 export default async function RootLayout({

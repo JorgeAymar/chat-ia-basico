@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -31,7 +32,7 @@ function LoginPageContent() {
     setFormError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(withBase("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -45,7 +46,7 @@ function LoginPageContent() {
         return;
       }
 
-      window.location.href = "/";
+      window.location.href = withBase("/");
     } catch {
       setFormError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
     } finally {

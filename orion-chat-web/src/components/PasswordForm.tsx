@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
 import { useEffect, useRef, useState } from "react";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -53,7 +54,7 @@ export function PasswordForm({
 
     setLoading(true);
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(withBase(endpoint), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),
@@ -67,7 +68,7 @@ export function PasswordForm({
         return;
       }
 
-      window.location.href = "/";
+      window.location.href = withBase("/");
     } catch {
       setError("No pudimos conectar con el servidor. Vuelve a intentarlo en unos minutos.");
     } finally {

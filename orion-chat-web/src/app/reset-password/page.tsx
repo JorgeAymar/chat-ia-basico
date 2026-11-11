@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { APP_NAME } from "@/lib/app-info";
@@ -18,7 +19,7 @@ function ResetPasswordPageContent() {
     if (!token) return;
     let cancelled = false;
 
-    fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`)
+    fetch(withBase(`/api/auth/reset-password?token=${encodeURIComponent(token)}`))
       .then((res) => res.json().catch(() => null))
       .then((data: { email?: string; error?: string } | null) => {
         if (cancelled) return;

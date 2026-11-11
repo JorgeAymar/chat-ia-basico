@@ -1,11 +1,9 @@
 import { ImageResponse } from "next/og";
 
-// Favicon/icon de pestaña — mismo diseño que public/logo.svg y
-// src/components/Logo.tsx (anillo de órbita + punto sobre navy).
-export const size = { width: 32, height: 32 };
-export const contentType = "image/png";
-
-export default function Icon() {
+// Ruta común y no la convención icon.tsx: bajo basePath (/app), el <link>
+// que Next arma solo para esa convención sale sin el prefijo y da 404. Este
+// se declara a mano en layout.tsx con withBase(). Mismo diseño que Logo.tsx.
+export async function GET() {
   return new ImageResponse(
     (
       <svg width={32} height={32} viewBox="0 0 32 32" fill="none">
@@ -14,6 +12,6 @@ export default function Icon() {
         <circle cx="23" cy="9" r="2.6" fill="#8b5cf6" />
       </svg>
     ),
-    { ...size }
+    { width: 32, height: 32 }
   );
 }

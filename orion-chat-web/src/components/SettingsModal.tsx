@@ -1,5 +1,6 @@
 "use client";
 
+import { withBase } from "@/lib/base-path";
 import { useEffect, useRef, useState } from "react";
 import type { Memory } from "@/lib/types";
 import { isTheme, type Theme } from "@/lib/theme";
@@ -80,7 +81,7 @@ function AppearancePicker() {
     document.documentElement.dataset.theme = next;
     setSaving(true);
     try {
-      const res = await fetch("/api/profile", {
+      const res = await fetch(withBase("/api/profile"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ theme: next }),

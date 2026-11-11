@@ -50,7 +50,8 @@ GREEN_PORT="$ORION_GREEN_PORT"
 
 STATE_FILE="${ORION_STATE_FILE:-/etc/orion/active_port}"
 NGINX_UPSTREAM_FILE="${ORION_NGINX_UPSTREAM_FILE:-/etc/nginx/orion-active-upstream.conf}"
-HEALTH_PATH="${ORION_HEALTH_PATH:-/api/health}"
+# La app web corre con basePath="/app" (ver orion-chat-web/next.config.ts).
+HEALTH_PATH="${ORION_HEALTH_PATH:-/app/api/health}"
 HEALTH_RETRIES="${ORION_HEALTH_RETRIES:-30}"
 HEALTH_DELAY="${ORION_HEALTH_DELAY:-2}"
 
@@ -166,7 +167,7 @@ if [ -n "$CURRENT_PORT" ] && [ "$OLD_NAME" != "$NEW_NAME" ]; then
   docker rm -f "$OLD_NAME" >/dev/null 2>&1 || true
 fi
 
-echo "==> Listo. ${APP_URL:-la app} sirve desde ${NEW_NAME} (:${NEW_PORT})."
+echo "==> Listo. ${APP_URL:-la app}/app sirve desde ${NEW_NAME} (:${NEW_PORT})."
 
 # ── landing estática (/presentacion) ─────────────────────────────────────
 # Copia atómica: se arma en un dir temporal y se intercambia con `mv`, así
@@ -203,7 +204,7 @@ echo "==> Construyendo la imagen de la app mobile…"
 # Contexto orion-chat-mobile/, NO la raíz del repo: es un proyecto Next.js
 # aparte con su propio package.json/Dockerfile (ver su Dockerfile ahí).
 : "${APP_URL:?falta APP_URL en $ENV_FILE (la mobile lo necesita en build time para sus rewrites)}"
-docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m --build-arg WEB_APP_ORIGIN="$APP_URL" -t orion-mobile:latest orion-chat-mobile/
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/m --build-arg WEB_APP_ORIGIN="${APP_URL}/app" -t orion-mobile:latest orion-chat-mobile/
 
 mkdir -p "$(dirname "$MOBILE_STATE_FILE")"
 MOBILE_CURRENT_PORT="$(cat "$MOBILE_STATE_FILE" 2>/dev/null || echo "")"
@@ -226,7 +227,7 @@ docker rm -f "$MOBILE_NEW_NAME" >/dev/null 2>&1 || true
 # en la bridge default de Docker.
 docker run -d --memory 256m --memory-swap 256m --name "$MOBILE_NEW_NAME" \
   -p "127.0.0.1:${MOBILE_NEW_PORT}:3000" \
-  -e WEB_APP_ORIGIN="$APP_URL" \
+  -e WEB_APP_ORIGIN="${APP_URL}/app" \
   -e NEXT_PUBLIC_BASE_PATH="/m" \
   --restart unless-stopped \
   orion-mobile:latest
